@@ -1,0 +1,400 @@
+#!/bin/bash
+# Unified appearance management - OS agnostic
+# Subcommands: get-mode, get-terminal-bg, reload, tmux-theme, focus-pane, watch
+
+set -euo pipefail
+
+# =============================================================================
+# DEFAULTS (override via environment)
+# =============================================================================
+: "${APPEARANCE_THEME_FILE:=/tmp/tmux-theme.conf}"
+: "${APPEARANCE_BORDER_PERCENT:=15}"
+: "${APPEARANCE_STATUS_BG_PERCENT:=10}"
+: "${APPEARANCE_STATUS_FG_PERCENT:=40}"
+: "${APPEARANCE_FOCUS_DIM_PERCENT:=10}"
+: "${APPEARANCE_LATITUDE:=52.37}"
+: "${APPEARANCE_LONGITUDE:=4.89}"
+
+# =============================================================================
+# OS DETECTION
+# =============================================================================
+OS="$(uname -s)"
+is_macos() { [[ "$OS" == "Darwin" ]]; }
+is_linux() { [[ "$OS" == "Linux" ]]; }
+
+# =============================================================================
+# MODE DETECTION
+# =============================================================================
+
+# Check if current time is during daylight hours using sunrise-sunset.org API
+is_daylight() {
+    local cache_file="/tmp/sunrise-sunset-cache.json"
+    local cache_max_age=86400  # 24 hours
+
+    # Check if cache exists and is fresh
+    if [[ -f "$cache_file" ]]; then
+        local cache_age=$(( $(date +%s) - $(stat -f%m "$cache_file" 2>/dev/null || stat -c%Y "$cache_file" 2>/dev/null || echo 0) ))
+        if (( cache_age < cache_max_age )); then
+            # Use cached data
+            local sunrise sunset now
+            sunrise=$(jq -r '.results.sunrise' "$cache_file" 2>/dev/null | cut -dT -f2 | cut -d+ -f1)
+            sunset=$(jq -r '.results.sunset' "$cache_file" 2>/dev/null | cut -dT -f2 | cut -d+ -f1)
+            now=$(date -u +%H:%M:%S)
+            [[ "$now" > "$sunrise" && "$now" < "$sunset" ]] && return 0 || return 1
+        fi
+    fi
+
+    # Fetch fresh data
+    local url="https://api.sunrise-sunset.org/json?lat=${APPEARANCE_LATITUDE}&lng=${APPEARANCE_LONGITUDE}&formatted=0"
+    if curl -s --max-time 5 "$url" > "$cache_file.tmp" 2>/dev/null; then
+        if jq -e '.status == "OK"' "$cache_file.tmp" >/dev/null 2>&1; then
+            mv "$cache_file.tmp" "$cache_file"
+            is_daylight  # Recurse with fresh cache
+            return $?
+        fi
+    fi
+    rm -f "$cache_file.tmp"
+
+    # API failed - fallback to simple time check (6-18)
+    local hour=$(date +%H)
+    (( hour >= 6 && hour < 18 ))
+}
+
+get_mode() {
+    # 1. Environment override (passed from host via SSH)
+    if [[ -n "${APPEARANCE_MODE:-}" ]]; then
+        echo "$APPEARANCE_MODE"
+        return
+    fi
+
+    # 2. macOS: detect from system preferences
+    if is_macos; then
+        if defaults read -g AppleInterfaceStyle 2>/dev/null | grep -q Dark; then
+            echo "dark"
+        else
+            echo "light"
+        fi
+        return
+    fi
+
+    # 3. Linux: use sunrise/sunset API
+    if is_daylight; then
+        echo "light"
+    else
+        echo "dark"
+    fi
+}
+
+# =============================================================================
+# TERMINAL BACKGROUND DETECTION
+# =============================================================================
+
+get_terminal_bg_from_iterm() {
+    python3 - "$1" <<'PY'
+import plistlib
+import subprocess
+import os
+import sys
+
+is_dark = sys.argv[1] == "1"
+mode_suffix = "Dark" if is_dark else "Light"
+
+result = subprocess.run(
+    ["defaults", "export", "com.googlecode.iterm2", "-"],
+    capture_output=True
+)
+if result.returncode != 0:
+    sys.exit(1)
+
+try:
+    plist = plistlib.loads(result.stdout)
+except Exception:
+    sys.exit(1)
+
+bookmarks = plist.get("New Bookmarks", [])
+if not bookmarks:
+    sys.exit(1)
+
+profile_name = os.environ.get("ITERM_PROFILE", "Default")
+profile = None
+for p in bookmarks:
+    if p.get("Name") == profile_name:
+        profile = p
+        break
+if profile is None:
+    profile = bookmarks[0]
+
+uses_separate = profile.get("Use Separate Colors for Light and Dark Mode", False)
+if uses_separate:
+    key = f"Background Color ({mode_suffix})"
+else:
+    key = "Background Color"
+
+bg = profile.get(key, {})
+if not bg:
+    sys.exit(1)
+
+def get_component(name):
+    val = bg.get(name, 0)
+    if isinstance(val, str):
+        val = float(val)
+    return int(val * 255)
+
+r = get_component("Red Component")
+g = get_component("Green Component")
+b = get_component("Blue Component")
+print(f"#{r:02x}{g:02x}{b:02x}")
+PY
+}
+
+get_terminal_bg() {
+    # 1. Environment override (passed from host via SSH)
+    if [[ -n "${TERMINAL_BG:-}" ]]; then
+        echo "$TERMINAL_BG"
+        return
+    fi
+
+    # 2. macOS: detect from iTerm
+    if is_macos; then
+        local is_dark
+        [[ "$(get_mode)" == "dark" ]] && is_dark="1" || is_dark="0"
+
+        local bg
+        if bg=$(get_terminal_bg_from_iterm "$is_dark" 2>/dev/null); then
+            echo "$bg"
+            return
+        fi
+    fi
+
+    # 3. No detection possible - this is expected for Linux (host should provide)
+    # Return empty - caller must handle
+    return 1
+}
+
+# =============================================================================
+# COLOR BLENDING
+# =============================================================================
+
+blend_hex() {
+    local base_hex="$1" target_hex="$2" percent="$3"
+
+    base_hex="${base_hex#\#}"
+    target_hex="${target_hex#\#}"
+
+    local br=$((16#${base_hex:0:2}))
+    local bg=$((16#${base_hex:2:2}))
+    local bb=$((16#${base_hex:4:2}))
+
+    local tr=$((16#${target_hex:0:2}))
+    local tg=$((16#${target_hex:2:2}))
+    local tb=$((16#${target_hex:4:2}))
+
+    local r=$(( (br * (100 - percent) + tr * percent + 50) / 100 ))
+    local g=$(( (bg * (100 - percent) + tg * percent + 50) / 100 ))
+    local b=$(( (bb * (100 - percent) + tb * percent + 50) / 100 ))
+
+    printf "#%02x%02x%02x" "$r" "$g" "$b"
+}
+
+compute_colors() {
+    local mode
+    mode="$(get_mode)"
+
+    if [[ "$mode" == "dark" ]]; then
+        BLEND_TARGET="#ffffff"
+    else
+        BLEND_TARGET="#000000"
+    fi
+
+    TERMINAL_BG="$(get_terminal_bg || true)"
+
+    if [[ -z "$TERMINAL_BG" ]]; then
+        echo "Error: TERMINAL_BG not available. Pass it via environment or run on macOS." >&2
+        return 1
+    fi
+
+    COLOR_BORDER="$(blend_hex "$TERMINAL_BG" "$BLEND_TARGET" "$APPEARANCE_BORDER_PERCENT")"
+    COLOR_STATUS_BG="$(blend_hex "$TERMINAL_BG" "$BLEND_TARGET" "$APPEARANCE_STATUS_BG_PERCENT")"
+    COLOR_STATUS_FG="$(blend_hex "$TERMINAL_BG" "$BLEND_TARGET" "$APPEARANCE_STATUS_FG_PERCENT")"
+    COLOR_FOCUS_DIM="$(blend_hex "$TERMINAL_BG" "$BLEND_TARGET" "$APPEARANCE_FOCUS_DIM_PERCENT")"
+}
+
+# =============================================================================
+# SUBCOMMANDS
+# =============================================================================
+
+cmd_get_mode() {
+    get_mode
+}
+
+cmd_get_terminal_bg() {
+    local bg
+    if bg=$(get_terminal_bg); then
+        echo "$bg"
+    else
+        exit 1
+    fi
+}
+
+cmd_watch() {
+    if is_macos; then
+        echo "On macOS, use the Swift-based appearance-watcher instead."
+        echo "This polling watcher is for Linux fallback only."
+    fi
+
+    echo "Starting appearance watcher (polling)..."
+
+    local last_mode
+    last_mode="$(get_mode)"
+
+    while true; do
+        sleep 60  # Check every minute
+        local current_mode
+        current_mode="$(get_mode)"
+        if [[ "$current_mode" != "$last_mode" ]]; then
+            last_mode="$current_mode"
+            "$0" reload
+        fi
+    done
+}
+
+cmd_reload() {
+    export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
+    local mode
+    mode="$(get_mode)"
+
+    # Compute colors - will fail if TERMINAL_BG not available
+    if ! compute_colors; then
+        echo "Skipping reload - no terminal background available" >&2
+        return 0
+    fi
+
+    # Regenerate tmux theme
+    "$0" tmux-theme
+
+    # Reload tmux config in all sessions
+    for session in $(tmux list-sessions -F '#S' 2>/dev/null); do
+        tmux source-file "$APPEARANCE_THEME_FILE" -t "$session" 2>/dev/null || true
+
+        # Inner tc_* sessions (not tc_tui) get fully transparent status bar
+        if [[ "$session" =~ ^tc_[a-f0-9]+$ ]]; then
+            local transparent="fg=$COLOR_STATUS_FG,bg=$TERMINAL_BG"
+            tmux set -t "$session" status-style "$transparent" 2>/dev/null || true
+            tmux set -t "$session" status-left-style "$transparent" 2>/dev/null || true
+            tmux set -t "$session" status-right-style "$transparent" 2>/dev/null || true
+            tmux set -t "$session" message-style "$transparent" 2>/dev/null || true
+            tmux setw -t "$session" window-status-style "$transparent" 2>/dev/null || true
+            tmux setw -t "$session" window-status-current-style "$transparent" 2>/dev/null || true
+        fi
+    done
+
+    # Update Gemini CLI
+    local gemini_settings="$HOME/.gemini/settings.json"
+    if [[ -f "$gemini_settings" ]]; then
+        local theme
+        [[ "$mode" == "dark" ]] && theme="Default" || theme="Default Light"
+        if jq -e '.ui' "$gemini_settings" >/dev/null 2>&1; then
+            jq --arg t "$theme" '.ui.theme = $t' "$gemini_settings" > /tmp/gemini-settings.tmp
+        else
+            jq --arg t "$theme" '. + {ui: {theme: $t}}' "$gemini_settings" > /tmp/gemini-settings.tmp
+        fi
+        [[ -s /tmp/gemini-settings.tmp ]] && mv /tmp/gemini-settings.tmp "$gemini_settings"
+    fi
+
+    # Update Claude CLI
+    local claude_settings="$HOME/.claude.json"
+    if [[ -f "$claude_settings" ]]; then
+        local theme
+        [[ "$mode" == "dark" ]] && theme="dark" || theme="light"
+        jq --arg t "$theme" '.theme = $t' "$claude_settings" > /tmp/claude-settings.tmp
+        [[ -s /tmp/claude-settings.tmp ]] && mv /tmp/claude-settings.tmp "$claude_settings"
+    fi
+}
+
+cmd_tmux_theme() {
+    if ! compute_colors; then
+        echo "Cannot generate theme - no terminal background available" >&2
+        return 1
+    fi
+
+    cat > "$APPEARANCE_THEME_FILE" <<EOF
+set -g pane-border-style "fg=${COLOR_BORDER},bg=${COLOR_BORDER}"
+set -g pane-active-border-style "fg=${COLOR_BORDER},bg=${COLOR_BORDER}"
+set -g window-style "bg=${COLOR_BORDER}"
+set -g window-active-style "bg=terminal"
+set -g status-style "fg=${COLOR_STATUS_FG},bg=${COLOR_STATUS_BG}"
+set -g status-left-style "fg=${COLOR_STATUS_FG},bg=${COLOR_STATUS_BG}"
+set -g status-right-style "fg=${COLOR_STATUS_FG},bg=${COLOR_STATUS_BG}"
+EOF
+}
+
+cmd_focus_pane() {
+    local pane_pid="${1:-}"
+
+    if [[ -z "$pane_pid" ]]; then
+        echo "Usage: appearance focus-pane <pane_pid>" >&2
+        return 1
+    fi
+
+    if ! compute_colors; then
+        return 0  # Silently skip if no colors available
+    fi
+
+    # Find which inner session is in the selected pane
+    local active_session
+    active_session=$(ps -o args= -p "$pane_pid" 2>/dev/null | grep -oE 'tc_[a-f0-9]+' | head -1 || true)
+
+    # Process all inner sessions
+    for session in $(tmux list-sessions -F '#S' 2>/dev/null | grep -E '^tc_[a-f0-9]+$'); do
+        if [[ "$session" == "$active_session" ]]; then
+            tmux set -t "$session" status-style "fg=$COLOR_STATUS_FG,bg=$TERMINAL_BG" 2>/dev/null || true
+        else
+            tmux set -t "$session" status-style "fg=$COLOR_STATUS_FG,bg=$COLOR_FOCUS_DIM" 2>/dev/null || true
+        fi
+    done
+}
+
+cmd_help() {
+    cat <<EOF
+Usage: appearance <command> [args]
+
+Commands:
+  get-mode          Output current mode (dark/light)
+  get-terminal-bg   Output terminal background hex color
+  reload            Reload all CLI themes
+  tmux-theme        Generate tmux theme file
+  focus-pane <pid>  Handle pane focus for inner tmux dimming
+  watch             Poll for appearance changes (Linux fallback)
+
+Environment variables:
+  APPEARANCE_MODE            Override mode detection (dark/light)
+  TERMINAL_BG                Override terminal background (#rrggbb)
+  APPEARANCE_THEME_FILE      Theme output file (default: /tmp/tmux-theme.conf)
+  APPEARANCE_BORDER_PERCENT  Border blend % (default: 15)
+  APPEARANCE_STATUS_BG_PERCENT  Status bar bg blend % (default: 10)
+  APPEARANCE_STATUS_FG_PERCENT  Status bar fg blend % (default: 40)
+  APPEARANCE_FOCUS_DIM_PERCENT  Focus dim blend % (default: 10)
+  APPEARANCE_LATITUDE        Latitude for sunrise/sunset (default: 52.37)
+  APPEARANCE_LONGITUDE       Longitude for sunrise/sunset (default: 4.89)
+EOF
+}
+
+# =============================================================================
+# MAIN DISPATCH
+# =============================================================================
+
+case "${1:-help}" in
+    get-mode)       cmd_get_mode ;;
+    get-terminal-bg) cmd_get_terminal_bg ;;
+    watch)          cmd_watch ;;
+    reload)         cmd_reload ;;
+    tmux-theme)     cmd_tmux_theme ;;
+    focus-pane)     cmd_focus_pane "${2:-}" ;;
+    help|--help|-h) cmd_help ;;
+    *)
+        echo "Unknown command: $1" >&2
+        cmd_help >&2
+        exit 1
+        ;;
+esac
