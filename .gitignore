@@ -1,1 +1,10 @@
+# Syncthing metadata
 .stfolder/
+.stversions/
+
+# Machine-specific configs (synced via Syncthing, not git)
+*.local.zsh
+*.local.sh
+
+# History/backup folders
+.history/
