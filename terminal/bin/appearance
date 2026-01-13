@@ -7,13 +7,14 @@ set -euo pipefail
 # =============================================================================
 # DEFAULTS (override via environment)
 # =============================================================================
-: "${APPEARANCE_THEME_FILE:=/tmp/tmux-theme.conf}"
-: "${APPEARANCE_BORDER_PERCENT:=15}"
-: "${APPEARANCE_STATUS_BG_PERCENT:=10}"
-: "${APPEARANCE_STATUS_FG_PERCENT:=40}"
-: "${APPEARANCE_FOCUS_DIM_PERCENT:=10}"
-: "${APPEARANCE_LATITUDE:=52.37}"
-: "${APPEARANCE_LONGITUDE:=4.89}"
+APPEARANCE_THEME_FILE="${APPEARANCE_THEME_FILE:-/tmp/tmux-theme.conf}"
+APPEARANCE_INACTIVE_BG_PERCENT="${APPEARANCE_INACTIVE_BG_PERCENT:-10}"
+APPEARANCE_STATUS_BG_PERCENT="${APPEARANCE_STATUS_BG_PERCENT:-20}"
+APPEARANCE_STATUS_FG_PERCENT="${APPEARANCE_STATUS_FG_PERCENT:-60}"
+APPEARANCE_TUI_STATUS_FG_PERCENT="${APPEARANCE_TUI_STATUS_FG_PERCENT:-40}"
+APPEARANCE_FOCUS_DIM_PERCENT="${APPEARANCE_FOCUS_DIM_PERCENT:-10}"
+APPEARANCE_LATITUDE="${APPEARANCE_LATITUDE:-52.37}"
+APPEARANCE_LONGITUDE="${APPEARANCE_LONGITUDE:-4.89}"
 
 # =============================================================================
 # OS DETECTION
@@ -213,9 +214,10 @@ compute_colors() {
         return 1
     fi
 
-    COLOR_BORDER="$(blend_hex "$TERMINAL_BG" "$BLEND_TARGET" "$APPEARANCE_BORDER_PERCENT")"
+    COLOR_INACTIVE_BG="$(blend_hex "$TERMINAL_BG" "$BLEND_TARGET" "$APPEARANCE_INACTIVE_BG_PERCENT")"
     COLOR_STATUS_BG="$(blend_hex "$TERMINAL_BG" "$BLEND_TARGET" "$APPEARANCE_STATUS_BG_PERCENT")"
     COLOR_STATUS_FG="$(blend_hex "$TERMINAL_BG" "$BLEND_TARGET" "$APPEARANCE_STATUS_FG_PERCENT")"
+    COLOR_TUI_STATUS_FG="$(blend_hex "$TERMINAL_BG" "$BLEND_TARGET" "$APPEARANCE_TUI_STATUS_FG_PERCENT")"
     COLOR_FOCUS_DIM="$(blend_hex "$TERMINAL_BG" "$BLEND_TARGET" "$APPEARANCE_FOCUS_DIM_PERCENT")"
 }
 
@@ -279,13 +281,16 @@ cmd_reload() {
 
         # Inner tc_* sessions (not tc_tui) get fully transparent status bar
         if [[ "$session" =~ ^tc_[a-f0-9]+$ ]]; then
-            local transparent="fg=$COLOR_STATUS_FG,bg=$TERMINAL_BG"
+            local transparent="fg=$COLOR_TUI_STATUS_FG,bg=$TERMINAL_BG"
             tmux set -t "$session" status-style "$transparent" 2>/dev/null || true
             tmux set -t "$session" status-left-style "$transparent" 2>/dev/null || true
             tmux set -t "$session" status-right-style "$transparent" 2>/dev/null || true
             tmux set -t "$session" message-style "$transparent" 2>/dev/null || true
             tmux setw -t "$session" window-status-style "$transparent" 2>/dev/null || true
             tmux setw -t "$session" window-status-current-style "$transparent" 2>/dev/null || true
+            tmux set -t "$session" status-right "" 2>/dev/null || true
+            tmux set -t "$session" status-right-length 0 2>/dev/null || true
+            tmux set -t "$session" status-left-length 40 2>/dev/null || true
         fi
     done
 
@@ -319,9 +324,9 @@ cmd_tmux_theme() {
     fi
 
     cat > "$APPEARANCE_THEME_FILE" <<EOF
-set -g pane-border-style "fg=${COLOR_BORDER},bg=${COLOR_BORDER}"
-set -g pane-active-border-style "fg=${COLOR_BORDER},bg=${COLOR_BORDER}"
-set -g window-style "bg=${COLOR_BORDER}"
+set -g pane-border-style "fg=${TERMINAL_BG},bg=${TERMINAL_BG}"
+set -g pane-active-border-style "fg=${TERMINAL_BG},bg=${TERMINAL_BG}"
+set -g window-style "bg=${COLOR_INACTIVE_BG}"
 set -g window-active-style "bg=terminal"
 set -g status-style "fg=${COLOR_STATUS_FG},bg=${COLOR_STATUS_BG}"
 set -g status-left-style "fg=${COLOR_STATUS_FG},bg=${COLOR_STATUS_BG}"
@@ -348,9 +353,9 @@ cmd_focus_pane() {
     # Process all inner sessions
     for session in $(tmux list-sessions -F '#S' 2>/dev/null | grep -E '^tc_[a-f0-9]+$'); do
         if [[ "$session" == "$active_session" ]]; then
-            tmux set -t "$session" status-style "fg=$COLOR_STATUS_FG,bg=$TERMINAL_BG" 2>/dev/null || true
+            tmux set -t "$session" status-style "fg=$COLOR_TUI_STATUS_FG,bg=$TERMINAL_BG" 2>/dev/null || true
         else
-            tmux set -t "$session" status-style "fg=$COLOR_STATUS_FG,bg=$COLOR_FOCUS_DIM" 2>/dev/null || true
+            tmux set -t "$session" status-style "fg=$COLOR_TUI_STATUS_FG,bg=$COLOR_FOCUS_DIM" 2>/dev/null || true
         fi
     done
 }
@@ -371,9 +376,10 @@ Environment variables:
   APPEARANCE_MODE            Override mode detection (dark/light)
   TERMINAL_BG                Override terminal background (#rrggbb)
   APPEARANCE_THEME_FILE      Theme output file (default: /tmp/tmux-theme.conf)
-  APPEARANCE_BORDER_PERCENT  Border blend % (default: 15)
+  APPEARANCE_INACTIVE_BG_PERCENT  Inactive pane bg blend % (default: 10)
   APPEARANCE_STATUS_BG_PERCENT  Status bar bg blend % (default: 10)
-  APPEARANCE_STATUS_FG_PERCENT  Status bar fg blend % (default: 40)
+  APPEARANCE_STATUS_FG_PERCENT  Status bar fg blend % (default: 60)
+  APPEARANCE_TUI_STATUS_FG_PERCENT  TUI status bar fg blend % (default: 40)
   APPEARANCE_FOCUS_DIM_PERCENT  Focus dim blend % (default: 10)
   APPEARANCE_LATITUDE        Latitude for sunrise/sunset (default: 52.37)
   APPEARANCE_LONGITUDE       Longitude for sunrise/sunset (default: 4.89)
