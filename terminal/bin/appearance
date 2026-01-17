@@ -1,406 +1,525 @@
-#!/bin/bash
-# Unified appearance management - OS agnostic
-# Subcommands: get-mode, get-terminal-bg, reload, tmux-theme, focus-pane, watch
+#!/usr/bin/env python3
+"""Unified appearance management - OS agnostic.
+Subcommands: get-mode, get-terminal-bg, reload, tmux-theme, focus-pane, watch
+"""
 
-set -euo pipefail
+from __future__ import annotations
 
-# =============================================================================
-# DEFAULTS (override via environment)
-# =============================================================================
-APPEARANCE_THEME_FILE="${APPEARANCE_THEME_FILE:-/tmp/tmux-theme.conf}"
-APPEARANCE_INACTIVE_BG_PERCENT="${APPEARANCE_INACTIVE_BG_PERCENT:-10}"
-APPEARANCE_STATUS_BG_PERCENT="${APPEARANCE_STATUS_BG_PERCENT:-20}"
-APPEARANCE_STATUS_FG_PERCENT="${APPEARANCE_STATUS_FG_PERCENT:-60}"
-APPEARANCE_TUI_STATUS_FG_PERCENT="${APPEARANCE_TUI_STATUS_FG_PERCENT:-40}"
-APPEARANCE_FOCUS_DIM_PERCENT="${APPEARANCE_FOCUS_DIM_PERCENT:-10}"
-APPEARANCE_LATITUDE="${APPEARANCE_LATITUDE:-52.37}"
-APPEARANCE_LONGITUDE="${APPEARANCE_LONGITUDE:-4.89}"
-
-# =============================================================================
-# OS DETECTION
-# =============================================================================
-OS="$(uname -s)"
-is_macos() { [[ "$OS" == "Darwin" ]]; }
-is_linux() { [[ "$OS" == "Linux" ]]; }
-
-# =============================================================================
-# MODE DETECTION
-# =============================================================================
-
-# Check if current time is during daylight hours using sunrise-sunset.org API
-is_daylight() {
-    local cache_file="/tmp/sunrise-sunset-cache.json"
-    local cache_max_age=86400  # 24 hours
-
-    # Check if cache exists and is fresh
-    if [[ -f "$cache_file" ]]; then
-        local cache_age=$(( $(date +%s) - $(stat -f%m "$cache_file" 2>/dev/null || stat -c%Y "$cache_file" 2>/dev/null || echo 0) ))
-        if (( cache_age < cache_max_age )); then
-            # Use cached data
-            local sunrise sunset now
-            sunrise=$(jq -r '.results.sunrise' "$cache_file" 2>/dev/null | cut -dT -f2 | cut -d+ -f1)
-            sunset=$(jq -r '.results.sunset' "$cache_file" 2>/dev/null | cut -dT -f2 | cut -d+ -f1)
-            now=$(date -u +%H:%M:%S)
-            [[ "$now" > "$sunrise" && "$now" < "$sunset" ]] && return 0 || return 1
-        fi
-    fi
-
-    # Fetch fresh data
-    local url="https://api.sunrise-sunset.org/json?lat=${APPEARANCE_LATITUDE}&lng=${APPEARANCE_LONGITUDE}&formatted=0"
-    if curl -s --max-time 5 "$url" > "$cache_file.tmp" 2>/dev/null; then
-        if jq -e '.status == "OK"' "$cache_file.tmp" >/dev/null 2>&1; then
-            mv "$cache_file.tmp" "$cache_file"
-            is_daylight  # Recurse with fresh cache
-            return $?
-        fi
-    fi
-    rm -f "$cache_file.tmp"
-
-    # API failed - fallback to simple time check (6-18)
-    local hour=$(date +%H)
-    (( hour >= 6 && hour < 18 ))
-}
-
-get_mode() {
-    # 1. Environment override (passed from host via SSH)
-    if [[ -n "${APPEARANCE_MODE:-}" ]]; then
-        echo "$APPEARANCE_MODE"
-        return
-    fi
-
-    # 2. macOS: detect from system preferences
-    if is_macos; then
-        if defaults read -g AppleInterfaceStyle 2>/dev/null | grep -q Dark; then
-            echo "dark"
-        else
-            echo "light"
-        fi
-        return
-    fi
-
-    # 3. Linux: use sunrise/sunset API
-    if is_daylight; then
-        echo "light"
-    else
-        echo "dark"
-    fi
-}
-
-# =============================================================================
-# TERMINAL BACKGROUND DETECTION
-# =============================================================================
-
-get_terminal_bg_from_iterm() {
-    python3 - "$1" <<'PY'
-import plistlib
-import subprocess
+import datetime
+import json
 import os
+import plistlib
+import re
+import subprocess
 import sys
+import time
+import urllib.request
+from pathlib import Path
+from typing import Any, Dict, Optional
 
-is_dark = sys.argv[1] == "1"
-mode_suffix = "Dark" if is_dark else "Light"
 
-result = subprocess.run(
-    ["defaults", "export", "com.googlecode.iterm2", "-"],
-    capture_output=True
-)
-if result.returncode != 0:
-    sys.exit(1)
+SCRIPT_DIR = Path(__file__).resolve().parent
 
-try:
-    plist = plistlib.loads(result.stdout)
-except Exception:
-    sys.exit(1)
 
-bookmarks = plist.get("New Bookmarks", [])
-if not bookmarks:
-    sys.exit(1)
+def int_env(name: str, default: int) -> int:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
 
-profile_name = os.environ.get("ITERM_PROFILE", "Default")
-profile = None
-for p in bookmarks:
-    if p.get("Name") == profile_name:
-        profile = p
-        break
-if profile is None:
-    profile = bookmarks[0]
 
-uses_separate = profile.get("Use Separate Colors for Light and Dark Mode", False)
-if uses_separate:
-    key = f"Background Color ({mode_suffix})"
-else:
-    key = "Background Color"
+APPEARANCE_THEME_FILE = os.environ.get("APPEARANCE_THEME_FILE", "/tmp/tmux-theme.conf")
+APPEARANCE_INACTIVE_BG_PERCENT = int_env("APPEARANCE_INACTIVE_BG_PERCENT", 5)
+APPEARANCE_STATUS_BG_PERCENT = int_env("APPEARANCE_STATUS_BG_PERCENT", 10)
+APPEARANCE_STATUS_FG_PERCENT = int_env("APPEARANCE_STATUS_FG_PERCENT", 50)
+APPEARANCE_TUI_STATUS_FG_PERCENT = int_env("APPEARANCE_TUI_STATUS_FG_PERCENT", 40)
+APPEARANCE_FOCUS_DIM_PERCENT = int_env("APPEARANCE_FOCUS_DIM_PERCENT", 5)
+APPEARANCE_LATITUDE = os.environ.get("APPEARANCE_LATITUDE", "52.37")
+APPEARANCE_LONGITUDE = os.environ.get("APPEARANCE_LONGITUDE", "4.89")
+APPEARANCE_LOG = os.environ.get("APPEARANCE_LOG", "1")
+APPEARANCE_LOG_FILE = os.environ.get("APPEARANCE_LOG_FILE", str(SCRIPT_DIR / "appearance.log"))
 
-bg = profile.get(key, {})
-if not bg:
-    sys.exit(1)
+DEFAULT_PATH_PREFIX = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+os.environ["PATH"] = f"{DEFAULT_PATH_PREFIX}:{os.environ.get('PATH', '')}"
 
-def get_component(name):
-    val = bg.get(name, 0)
-    if isinstance(val, str):
-        val = float(val)
-    return int(val * 255)
 
-r = get_component("Red Component")
-g = get_component("Green Component")
-b = get_component("Blue Component")
-print(f"#{r:02x}{g:02x}{b:02x}")
-PY
-}
-
-get_terminal_bg() {
-    # 1. Environment override (passed from host via SSH)
-    if [[ -n "${TERMINAL_BG:-}" ]]; then
-        echo "$TERMINAL_BG"
+def log(message: str) -> None:
+    if APPEARANCE_LOG != "1":
         return
-    fi
+    ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        with open(APPEARANCE_LOG_FILE, "a", encoding="utf-8") as handle:
+            handle.write(f"{ts} {message}\n")
+    except OSError:
+        pass
 
-    # 2. macOS: detect from iTerm
-    if is_macos; then
-        local is_dark
-        [[ "$(get_mode)" == "dark" ]] && is_dark="1" || is_dark="0"
 
-        local bg
-        if bg=$(get_terminal_bg_from_iterm "$is_dark" 2>/dev/null); then
-            echo "$bg"
-            return
-        fi
-    fi
+def is_macos() -> bool:
+    return sys.platform == "darwin"
 
-    # 3. No detection possible - this is expected for Linux (host should provide)
-    # Return empty - caller must handle
-    return 1
-}
 
-# =============================================================================
-# COLOR BLENDING
-# =============================================================================
+def run_command(args: list[str], check: bool = False) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(args, check=check, capture_output=True, text=True)
 
-blend_hex() {
-    local base_hex="$1" target_hex="$2" percent="$3"
 
-    base_hex="${base_hex#\#}"
-    target_hex="${target_hex#\#}"
+def is_daylight() -> bool:
+    cache_file = Path("/tmp/sunrise-sunset-cache.json")
+    cache_max_age = 86400
 
-    local br=$((16#${base_hex:0:2}))
-    local bg=$((16#${base_hex:2:2}))
-    local bb=$((16#${base_hex:4:2}))
+    def parse_time(value: str) -> Optional[datetime.time]:
+        try:
+            dt = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return dt.time()
+        except ValueError:
+            try:
+                time_part = value.split("T", 1)[1].split("+", 1)[0]
+                return datetime.time.fromisoformat(time_part)
+            except Exception:
+                return None
 
-    local tr=$((16#${target_hex:0:2}))
-    local tg=$((16#${target_hex:2:2}))
-    local tb=$((16#${target_hex:4:2}))
+    def is_now_between(sunrise: str, sunset: str) -> bool:
+        sunrise_time = parse_time(sunrise)
+        sunset_time = parse_time(sunset)
+        if sunrise_time is None or sunset_time is None:
+            return False
+        now_time = datetime.datetime.utcnow().time()
+        return sunrise_time < now_time < sunset_time
 
-    local r=$(( (br * (100 - percent) + tr * percent + 50) / 100 ))
-    local g=$(( (bg * (100 - percent) + tg * percent + 50) / 100 ))
-    local b=$(( (bb * (100 - percent) + tb * percent + 50) / 100 ))
+    if cache_file.exists():
+        age = int(time.time() - cache_file.stat().st_mtime)
+        if age < cache_max_age:
+            try:
+                data = json.loads(cache_file.read_text(encoding="utf-8"))
+                results = data.get("results", {})
+                sunrise = results.get("sunrise")
+                sunset = results.get("sunset")
+                if sunrise and sunset:
+                    return is_now_between(sunrise, sunset)
+            except Exception:
+                pass
 
-    printf "#%02x%02x%02x" "$r" "$g" "$b"
-}
+    url = (
+        "https://api.sunrise-sunset.org/json"
+        f"?lat={APPEARANCE_LATITUDE}&lng={APPEARANCE_LONGITUDE}&formatted=0"
+    )
+    try:
+        with urllib.request.urlopen(url, timeout=5) as response:
+            payload = response.read().decode("utf-8")
+        data = json.loads(payload)
+        if data.get("status") == "OK":
+            cache_file.write_text(json.dumps(data), encoding="utf-8")
+            results = data.get("results", {})
+            sunrise = results.get("sunrise")
+            sunset = results.get("sunset")
+            if sunrise and sunset:
+                return is_now_between(sunrise, sunset)
+    except Exception:
+        pass
 
-compute_colors() {
-    local mode
-    mode="$(get_mode)"
+    hour = datetime.datetime.now().hour
+    return 6 <= hour < 18
 
-    if [[ "$mode" == "dark" ]]; then
-        BLEND_TARGET="#ffffff"
-    else
-        BLEND_TARGET="#000000"
-    fi
 
-    TERMINAL_BG="$(get_terminal_bg || true)"
+def get_mode() -> str:
+    env_mode = os.environ.get("APPEARANCE_MODE")
+    if env_mode:
+        log(f"get_mode using APPEARANCE_MODE={env_mode}")
+        return env_mode
 
-    if [[ -z "$TERMINAL_BG" ]]; then
-        echo "Error: TERMINAL_BG not available. Pass it via environment or run on macOS." >&2
+    if is_macos():
+        try:
+            result = run_command(["defaults", "read", "-g", "AppleInterfaceStyle"])
+            if result.returncode == 0 and "Dark" in result.stdout:
+                log("get_mode detected dark from macOS defaults")
+                return "dark"
+        except Exception:
+            pass
+        log("get_mode detected light from macOS defaults")
+        return "light"
+
+    if is_daylight():
+        log("get_mode detected light from sunrise-sunset")
+        return "light"
+
+    log("get_mode detected dark from sunrise-sunset")
+    return "dark"
+
+
+def load_iterm_plist() -> Optional[Dict[str, Any]]:
+    plist_path = Path.home() / "Library" / "Preferences" / "com.googlecode.iterm2.plist"
+    if plist_path.exists():
+        try:
+            with plist_path.open("rb") as handle:
+                return plistlib.load(handle)
+        except Exception:
+            pass
+
+    try:
+        result = subprocess.run(
+            ["defaults", "export", "com.googlecode.iterm2", "-"],
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            return None
+        return plistlib.loads(result.stdout)
+    except Exception:
+        return None
+
+
+def component_value(color: Dict[str, Any], key: str) -> int:
+    value = color.get(key, 0)
+    try:
+        if isinstance(value, str):
+            value = float(value)
+        value = float(value)
+    except Exception:
+        value = 0
+    return max(0, min(255, int(value * 255)))
+
+
+def get_terminal_bg_from_iterm(is_dark: bool) -> Optional[str]:
+    plist = load_iterm_plist()
+    if not plist:
+        return None
+
+    bookmarks = plist.get("New Bookmarks", [])
+    if not bookmarks:
+        return None
+
+    profile_name = os.environ.get("ITERM_PROFILE", "Default")
+    profile = None
+    for entry in bookmarks:
+        if entry.get("Name") == profile_name:
+            profile = entry
+            break
+    if profile is None:
+        profile = bookmarks[0]
+
+    uses_separate = bool(profile.get("Use Separate Colors for Light and Dark Mode", False))
+    if uses_separate:
+        mode_suffix = "Dark" if is_dark else "Light"
+        key = f"Background Color ({mode_suffix})"
+    else:
+        key = "Background Color"
+
+    bg = profile.get(key) or {}
+    if not bg:
+        return None
+
+    red = component_value(bg, "Red Component")
+    green = component_value(bg, "Green Component")
+    blue = component_value(bg, "Blue Component")
+    return f"#{red:02x}{green:02x}{blue:02x}"
+
+
+def get_terminal_bg() -> Optional[str]:
+    env_bg = os.environ.get("TERMINAL_BG")
+    if env_bg:
+        log(f"get_terminal_bg using TERMINAL_BG={env_bg}")
+        return env_bg
+
+    if is_macos():
+        mode = get_mode()
+        is_dark = mode == "dark"
+        bg = get_terminal_bg_from_iterm(is_dark)
+        if bg:
+            log("get_terminal_bg detected from iTerm profile")
+            return bg
+
+    return None
+
+
+def blend_hex(base_hex: str, target_hex: str, percent: int) -> str:
+    base_hex = base_hex.lstrip("#")
+    target_hex = target_hex.lstrip("#")
+
+    br = int(base_hex[0:2], 16)
+    bg = int(base_hex[2:4], 16)
+    bb = int(base_hex[4:6], 16)
+
+    tr = int(target_hex[0:2], 16)
+    tg = int(target_hex[2:4], 16)
+    tb = int(target_hex[4:6], 16)
+
+    r = (br * (100 - percent) + tr * percent + 50) // 100
+    g = (bg * (100 - percent) + tg * percent + 50) // 100
+    b = (bb * (100 - percent) + tb * percent + 50) // 100
+
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def compute_colors() -> Optional[Dict[str, str]]:
+    mode = get_mode()
+    log(f"compute_colors mode={mode}")
+
+    blend_target = "#ffffff" if mode == "dark" else "#000000"
+    terminal_bg = get_terminal_bg()
+    if not terminal_bg:
+        log("compute_colors missing TERMINAL_BG")
+        return None
+
+    return {
+        "mode": mode,
+        "terminal_bg": terminal_bg,
+        "inactive_bg": blend_hex(terminal_bg, blend_target, APPEARANCE_INACTIVE_BG_PERCENT),
+        "status_bg": blend_hex(terminal_bg, blend_target, APPEARANCE_STATUS_BG_PERCENT),
+        "status_fg": blend_hex(terminal_bg, blend_target, APPEARANCE_STATUS_FG_PERCENT),
+        "tui_status_fg": blend_hex(terminal_bg, blend_target, APPEARANCE_TUI_STATUS_FG_PERCENT),
+        "focus_dim": blend_hex(terminal_bg, blend_target, APPEARANCE_FOCUS_DIM_PERCENT),
+    }
+
+
+def write_tmux_theme(colors: Dict[str, str]) -> None:
+    theme = (
+        f"set -g pane-border-style \"fg={colors['terminal_bg']},bg={colors['terminal_bg']}\"\n"
+        f"set -g pane-active-border-style \"fg={colors['terminal_bg']},bg={colors['terminal_bg']}\"\n"
+        f"set -g window-style \"bg={colors['inactive_bg']}\"\n"
+        "set -g window-active-style \"bg=terminal\"\n"
+        f"set -g status-style \"fg={colors['status_fg']},bg={colors['status_bg']}\"\n"
+        f"set -g status-left-style \"fg={colors['status_fg']},bg={colors['status_bg']}\"\n"
+        f"set -g status-right-style \"fg={colors['status_fg']},bg={colors['status_bg']}\"\n"
+    )
+    Path(APPEARANCE_THEME_FILE).write_text(theme, encoding="utf-8")
+    log(f"tmux-theme wrote {APPEARANCE_THEME_FILE}")
+
+
+def tmux_command(args: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(["tmux", *args], capture_output=True, text=True)
+
+
+def tmux_sessions() -> list[str]:
+    result = tmux_command(["list-sessions", "-F", "#S"])
+    if result.returncode != 0:
+        return []
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def update_gemini_theme(mode: str) -> None:
+    settings_path = Path.home() / ".gemini" / "settings.json"
+    if not settings_path.exists():
+        return
+
+    theme = "Default" if mode == "dark" else "Default Light"
+    log(f"reload gemini theme={theme} file={settings_path}")
+    try:
+        data = json.loads(settings_path.read_text(encoding="utf-8"))
+        ui = data.get("ui")
+        if not isinstance(ui, dict):
+            ui = {}
+            data["ui"] = ui
+        ui["theme"] = theme
+        settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    except Exception as exc:
+        log(f"reload gemini theme failed error={exc}")
+
+
+def update_claude_theme(mode: str) -> None:
+    settings_path = Path.home() / ".claude.json"
+    if not settings_path.exists():
+        return
+
+    theme = "dark" if mode == "dark" else "light"
+    log(f"reload claude theme={theme} file={settings_path}")
+    try:
+        data = json.loads(settings_path.read_text(encoding="utf-8"))
+        data["theme"] = theme
+        settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    except Exception as exc:
+        log(f"reload claude theme failed error={exc}")
+
+
+def cmd_get_mode() -> int:
+    print(get_mode())
+    return 0
+
+
+def cmd_get_terminal_bg() -> int:
+    bg = get_terminal_bg()
+    if not bg:
         return 1
-    fi
+    print(bg)
+    return 0
 
-    COLOR_INACTIVE_BG="$(blend_hex "$TERMINAL_BG" "$BLEND_TARGET" "$APPEARANCE_INACTIVE_BG_PERCENT")"
-    COLOR_STATUS_BG="$(blend_hex "$TERMINAL_BG" "$BLEND_TARGET" "$APPEARANCE_STATUS_BG_PERCENT")"
-    COLOR_STATUS_FG="$(blend_hex "$TERMINAL_BG" "$BLEND_TARGET" "$APPEARANCE_STATUS_FG_PERCENT")"
-    COLOR_TUI_STATUS_FG="$(blend_hex "$TERMINAL_BG" "$BLEND_TARGET" "$APPEARANCE_TUI_STATUS_FG_PERCENT")"
-    COLOR_FOCUS_DIM="$(blend_hex "$TERMINAL_BG" "$BLEND_TARGET" "$APPEARANCE_FOCUS_DIM_PERCENT")"
-}
 
-# =============================================================================
-# SUBCOMMANDS
-# =============================================================================
+def cmd_tmux_theme() -> int:
+    colors = compute_colors()
+    if not colors:
+        print("Cannot generate theme - no terminal background available", file=sys.stderr)
+        log("tmux-theme compute_colors failed")
+        return 1
+    write_tmux_theme(colors)
+    return 0
 
-cmd_get_mode() {
-    get_mode
-}
 
-cmd_get_terminal_bg() {
-    local bg
-    if bg=$(get_terminal_bg); then
-        echo "$bg"
-    else
-        exit 1
-    fi
-}
+def cmd_reload() -> int:
+    mode = get_mode()
+    log(f"reload start pid={os.getpid()} mode={mode}")
 
-cmd_watch() {
-    if is_macos; then
-        echo "On macOS, use the Swift-based appearance-watcher instead."
-        echo "This polling watcher is for Linux fallback only."
-    fi
-
-    echo "Starting appearance watcher (polling)..."
-
-    local last_mode
-    last_mode="$(get_mode)"
-
-    while true; do
-        sleep 60  # Check every minute
-        local current_mode
-        current_mode="$(get_mode)"
-        if [[ "$current_mode" != "$last_mode" ]]; then
-            last_mode="$current_mode"
-            "$0" reload
-        fi
-    done
-}
-
-cmd_reload() {
-    export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
-
-    local mode
-    mode="$(get_mode)"
-
-    # Compute colors - will fail if TERMINAL_BG not available
-    if ! compute_colors; then
-        echo "Skipping reload - no terminal background available" >&2
+    colors = compute_colors()
+    if not colors:
+        log("reload compute_colors failed")
+        print("Skipping reload - no terminal background available", file=sys.stderr)
         return 0
-    fi
 
-    # Regenerate tmux theme
-    "$0" tmux-theme
+    log(
+        "reload colors "
+        f"terminal_bg={colors['terminal_bg']} "
+        f"inactive_bg={colors['inactive_bg']} "
+        f"status_bg={colors['status_bg']} "
+        f"status_fg={colors['status_fg']} "
+        f"tui_status_fg={colors['tui_status_fg']} "
+        f"focus_dim={colors['focus_dim']}"
+    )
 
-    # Reload tmux config in all sessions
-    for session in $(tmux list-sessions -F '#S' 2>/dev/null); do
-        tmux source-file "$APPEARANCE_THEME_FILE" -t "$session" 2>/dev/null || true
+    write_tmux_theme(colors)
 
-        # Inner tc_* sessions (not tc_tui) get fully transparent status bar
-        if [[ "$session" =~ ^tc_[a-f0-9]+$ ]]; then
-            local transparent="fg=$COLOR_TUI_STATUS_FG,bg=$TERMINAL_BG"
-            tmux set -t "$session" status-style "$transparent" 2>/dev/null || true
-            tmux set -t "$session" status-left-style "$transparent" 2>/dev/null || true
-            tmux set -t "$session" status-right-style "$transparent" 2>/dev/null || true
-            tmux set -t "$session" message-style "$transparent" 2>/dev/null || true
-            tmux setw -t "$session" window-status-style "$transparent" 2>/dev/null || true
-            tmux setw -t "$session" window-status-current-style "$transparent" 2>/dev/null || true
-            tmux set -t "$session" status-right "" 2>/dev/null || true
-            tmux set -t "$session" status-right-length 0 2>/dev/null || true
-            tmux set -t "$session" status-left-length 40 2>/dev/null || true
-        fi
-    done
+    tmux_result = tmux_command(["source-file", APPEARANCE_THEME_FILE])
+    if tmux_result.returncode == 0:
+        log(f"reload tmux source-file ok theme_file={APPEARANCE_THEME_FILE}")
+    else:
+        log(f"reload tmux source-file failed theme_file={APPEARANCE_THEME_FILE}")
 
-    # Update Gemini CLI
-    local gemini_settings="$HOME/.gemini/settings.json"
-    if [[ -f "$gemini_settings" ]]; then
-        local theme
-        [[ "$mode" == "dark" ]] && theme="Default" || theme="Default Light"
-        if jq -e '.ui' "$gemini_settings" >/dev/null 2>&1; then
-            jq --arg t "$theme" '.ui.theme = $t' "$gemini_settings" > /tmp/gemini-settings.tmp
-        else
-            jq --arg t "$theme" '. + {ui: {theme: $t}}' "$gemini_settings" > /tmp/gemini-settings.tmp
-        fi
-        [[ -s /tmp/gemini-settings.tmp ]] && mv /tmp/gemini-settings.tmp "$gemini_settings"
-    fi
+    tmux_command(["set", "-g", "@appearance_mode", colors["mode"]])
+    # Notify TeleClaude TUI directly to refresh colors (no tmux hook reliance).
+    pgrep = subprocess.run(
+        ["/usr/bin/pgrep", "-f", "teleclaude.cli.telec"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    pids = [pid for pid in pgrep.stdout.split() if pid.isdigit()]
+    for pid in pids:
+        subprocess.run(
+            ["/bin/kill", "-USR1", pid],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
 
-    # Update Claude CLI
-    local claude_settings="$HOME/.claude.json"
-    if [[ -f "$claude_settings" ]]; then
-        local theme
-        [[ "$mode" == "dark" ]] && theme="dark" || theme="light"
-        jq --arg t "$theme" '.theme = $t' "$claude_settings" > /tmp/claude-settings.tmp
-        [[ -s /tmp/claude-settings.tmp ]] && mv /tmp/claude-settings.tmp "$claude_settings"
-    fi
-}
+    sessions = tmux_sessions()
+    log(f"reload tmux sessions: {' '.join(sessions)}")
+    for session in sessions:
+        if re.match(r"^tc_[a-f0-9]+$", session):
+            transparent = f"fg={colors['tui_status_fg']},bg={colors['terminal_bg']}"
+            log(f"reload tmux inner session={session} applying transparent status")
+            tmux_command(["set", "-t", session, "status-style", transparent])
+            tmux_command(["set", "-t", session, "status-left-style", transparent])
+            tmux_command(["set", "-t", session, "status-right-style", transparent])
+            tmux_command(["set", "-t", session, "message-style", transparent])
+            tmux_command(["setw", "-t", session, "window-status-style", transparent])
+            tmux_command(["setw", "-t", session, "window-status-current-style", transparent])
+            tmux_command(["set", "-t", session, "status-right", ""])
+            tmux_command(["set", "-t", session, "status-right-length", "0"])
+            tmux_command(["set", "-t", session, "status-left-length", "40"])
 
-cmd_tmux_theme() {
-    if ! compute_colors; then
-        echo "Cannot generate theme - no terminal background available" >&2
+    update_gemini_theme(colors["mode"])
+    update_claude_theme(colors["mode"])
+    log("reload complete")
+    return 0
+
+
+def cmd_focus_pane(pane_pid: str) -> int:
+    if not pane_pid:
+        print("Usage: appearance focus-pane <pane_pid>", file=sys.stderr)
         return 1
-    fi
 
-    cat > "$APPEARANCE_THEME_FILE" <<EOF
-set -g pane-border-style "fg=${TERMINAL_BG},bg=${TERMINAL_BG}"
-set -g pane-active-border-style "fg=${TERMINAL_BG},bg=${TERMINAL_BG}"
-set -g window-style "bg=${COLOR_INACTIVE_BG}"
-set -g window-active-style "bg=terminal"
-set -g status-style "fg=${COLOR_STATUS_FG},bg=${COLOR_STATUS_BG}"
-set -g status-left-style "fg=${COLOR_STATUS_FG},bg=${COLOR_STATUS_BG}"
-set -g status-right-style "fg=${COLOR_STATUS_FG},bg=${COLOR_STATUS_BG}"
-EOF
-}
+    colors = compute_colors()
+    if not colors:
+        return 0
 
-cmd_focus_pane() {
-    local pane_pid="${1:-}"
+    active_session = ""
+    try:
+        result = subprocess.run(
+            ["ps", "-o", "args=", "-p", pane_pid],
+            capture_output=True,
+            text=True,
+        )
+        match = re.search(r"tc_[a-f0-9]+", result.stdout)
+        if match:
+            active_session = match.group(0)
+    except Exception:
+        pass
 
-    if [[ -z "$pane_pid" ]]; then
-        echo "Usage: appearance focus-pane <pane_pid>" >&2
-        return 1
-    fi
+    for session in tmux_sessions():
+        if not re.match(r"^tc_[a-f0-9]+$", session):
+            continue
+        if session == active_session:
+            style = f"fg={colors['tui_status_fg']},bg={colors['terminal_bg']}"
+        else:
+            style = f"fg={colors['tui_status_fg']},bg={colors['focus_dim']}"
+        tmux_command(["set", "-t", session, "status-style", style])
 
-    if ! compute_colors; then
-        return 0  # Silently skip if no colors available
-    fi
+    return 0
 
-    # Find which inner session is in the selected pane
-    local active_session
-    active_session=$(ps -o args= -p "$pane_pid" 2>/dev/null | grep -oE 'tc_[a-f0-9]+' | head -1 || true)
 
-    # Process all inner sessions
-    for session in $(tmux list-sessions -F '#S' 2>/dev/null | grep -E '^tc_[a-f0-9]+$'); do
-        if [[ "$session" == "$active_session" ]]; then
-            tmux set -t "$session" status-style "fg=$COLOR_TUI_STATUS_FG,bg=$TERMINAL_BG" 2>/dev/null || true
-        else
-            tmux set -t "$session" status-style "fg=$COLOR_TUI_STATUS_FG,bg=$COLOR_FOCUS_DIM" 2>/dev/null || true
-        fi
-    done
-}
+def cmd_watch() -> int:
+    if is_macos():
+        print("On macOS, use the Swift-based appearance-watcher instead.")
+        print("This polling watcher is for Linux fallback only.")
 
-cmd_help() {
-    cat <<EOF
-Usage: appearance <command> [args]
+    print("Starting appearance watcher (polling)...")
+    last_mode = get_mode()
+    while True:
+        time.sleep(60)
+        current_mode = get_mode()
+        if current_mode != last_mode:
+            last_mode = current_mode
+            cmd_reload()
+
+
+def cmd_help() -> int:
+    help_text = f"""Usage: appearance <command> [args]
 
 Commands:
   get-mode          Output current mode (dark/light)
   get-terminal-bg   Output terminal background hex color
   reload            Reload all CLI themes
-  tmux-theme        Generate tmux theme file
+  tmux-theme        Generate {APPEARANCE_THEME_FILE}
   focus-pane <pid>  Handle pane focus for inner tmux dimming
   watch             Poll for appearance changes (Linux fallback)
 
 Environment variables:
-  APPEARANCE_MODE            Override mode detection (dark/light)
-  TERMINAL_BG                Override terminal background (#rrggbb)
-  APPEARANCE_THEME_FILE      Theme output file (default: /tmp/tmux-theme.conf)
-  APPEARANCE_INACTIVE_BG_PERCENT  Inactive pane bg blend % (default: 10)
-  APPEARANCE_STATUS_BG_PERCENT  Status bar bg blend % (default: 10)
-  APPEARANCE_STATUS_FG_PERCENT  Status bar fg blend % (default: 60)
+  APPEARANCE_MODE                 Override mode detection (dark/light)
+  TERMINAL_BG                     Override terminal background (#rrggbb)
+  APPEARANCE_THEME_FILE           Theme output file (default: /tmp/tmux-theme.conf)
+  APPEARANCE_INACTIVE_BG_PERCENT  Inactive pane bg blend % (default: 5)
+  APPEARANCE_STATUS_BG_PERCENT    Status bar bg blend % (default: 10)
+  APPEARANCE_STATUS_FG_PERCENT    Status bar fg blend % (default: 50)
   APPEARANCE_TUI_STATUS_FG_PERCENT  TUI status bar fg blend % (default: 40)
-  APPEARANCE_FOCUS_DIM_PERCENT  Focus dim blend % (default: 10)
-  APPEARANCE_LATITUDE        Latitude for sunrise/sunset (default: 52.37)
-  APPEARANCE_LONGITUDE       Longitude for sunrise/sunset (default: 4.89)
-EOF
-}
+  APPEARANCE_FOCUS_DIM_PERCENT    Focus dim blend % (default: 5)
+  APPEARANCE_LATITUDE             Latitude for sunrise-sunset (default: 52.37)
+  APPEARANCE_LONGITUDE            Longitude for sunrise-sunset (default: 4.89)
+  APPEARANCE_LOG                  Enable logging (default: 1)
+  APPEARANCE_LOG_FILE             Log file path (default: {SCRIPT_DIR / 'appearance.log'})
+"""
+    print(help_text)
+    return 0
 
-# =============================================================================
-# MAIN DISPATCH
-# =============================================================================
 
-case "${1:-help}" in
-    get-mode)       cmd_get_mode ;;
-    get-terminal-bg) cmd_get_terminal_bg ;;
-    watch)          cmd_watch ;;
-    reload)         cmd_reload ;;
-    tmux-theme)     cmd_tmux_theme ;;
-    focus-pane)     cmd_focus_pane "${2:-}" ;;
-    help|--help|-h) cmd_help ;;
-    *)
-        echo "Unknown command: $1" >&2
-        cmd_help >&2
-        exit 1
-        ;;
-esac
+def main() -> int:
+    command = sys.argv[1] if len(sys.argv) > 1 else "help"
+    if command == "get-mode":
+        return cmd_get_mode()
+    if command == "get-terminal-bg":
+        return cmd_get_terminal_bg()
+    if command == "reload":
+        return cmd_reload()
+    if command == "tmux-theme":
+        return cmd_tmux_theme()
+    if command == "focus-pane":
+        arg = sys.argv[2] if len(sys.argv) > 2 else ""
+        return cmd_focus_pane(arg)
+    if command == "watch":
+        return cmd_watch()
+    if command in {"help", "--help", "-h"}:
+        return cmd_help()
+
+    print(f"Unknown command: {command}", file=sys.stderr)
+    return cmd_help()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
