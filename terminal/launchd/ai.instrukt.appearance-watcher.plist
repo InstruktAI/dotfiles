@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.morriz.appearance-watcher</string>
+    <string>ai.instrukt.appearance-watcher</string>
     <key>ProgramArguments</key>
     <array>
         <string>/Users/Morriz/.local/bin/appearance-watcher</string>

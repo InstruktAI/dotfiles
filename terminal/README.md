@@ -76,10 +76,10 @@ appearance watch            # Poll for changes (Linux)
 ```
 terminal/
 ├── bin/
-│   ├── appearance              # Main script (bash)
+│   ├── appearance              # Main script (python)
 │   └── appearance-watcher.swift # macOS watcher (Swift)
 ├── launchd/
-│   └── com.morriz.appearance-watcher.plist
+│   └── ai.instrukt.appearance-watcher.plist
 ├── tmux.conf                   # Shared tmux configuration
 ├── install.sh                  # Idempotent installer
 └── README.md

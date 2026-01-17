@@ -6,13 +6,13 @@ if [[ -x "/Applications/Docker.app/Contents/Resources/bin/docker" ]]; then
 fi
 
 # Custom completions directory (generated / local overrides).
-if [[ -d "$HOME/.config/zsh/completions" ]]; then
-  fpath=("$HOME/.config/zsh/completions" $fpath)
+if [[ -d "${0:h}/completions" ]]; then
+  fpath=("${0:h}/completions" $fpath)
 
   # Auto-invalidate zcompdump if any completion file is newer
   local zcompdump="${ZDOTDIR:-$HOME}/.zcompdump"*(.N[1])
   if [[ -n "$zcompdump" ]]; then
-    local newest_completion="$HOME/.config/zsh/completions"/*(.om[1]N)
+    local newest_completion="${0:h}/completions"/*(.om[1]N)
     if [[ -n "$newest_completion" && "$newest_completion" -nt "$zcompdump" ]]; then
       rm -f "${ZDOTDIR:-$HOME}"/.zcompdump*
     fi

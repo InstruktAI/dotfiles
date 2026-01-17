@@ -8,3 +8,6 @@
 
 # History/backup folders
 .history/
+
+# Appearance logs
+terminal/bin/appearance.log

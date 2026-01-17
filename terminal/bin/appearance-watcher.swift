@@ -4,34 +4,91 @@
 // Or run directly: swift appearance-watcher.swift
 
 import Cocoa
+import Darwin
+
+private let appearanceNotificationName = NSNotification.Name("AppleInterfaceThemeChangedNotification")
+
+private func appearanceDarwinCallback(
+    _ center: CFNotificationCenter?,
+    _ observer: UnsafeMutableRawPointer?,
+    _ name: CFNotificationName?,
+    _ object: UnsafeRawPointer?,
+    _ userInfo: CFDictionary?
+) {
+    guard let observer = observer else { return }
+    let watcher = Unmanaged<AppearanceWatcher>.fromOpaque(observer).takeUnretainedValue()
+    watcher.appearanceChanged(Notification(name: appearanceNotificationName))
+}
 
 class AppearanceWatcher {
+    private let logDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter
+    }()
+
+    private var debounceWorkItem: DispatchWorkItem?
+
+    private func log(_ message: String) {
+        let ts = logDateFormatter.string(from: Date())
+        print("[\(ts)] \(message)")
+        fflush(stdout)
+    }
+
     init() {
+        log("started")
         DistributedNotificationCenter.default.addObserver(
             self,
             selector: #selector(appearanceChanged),
-            name: NSNotification.Name("AppleInterfaceThemeChangedNotification"),
+            name: appearanceNotificationName,
             object: nil
         )
+        log("registered distributed notification")
+
+        let darwinCenter = CFNotificationCenterGetDarwinNotifyCenter()
+        let observer = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
+        CFNotificationCenterAddObserver(
+            darwinCenter,
+            observer,
+            appearanceDarwinCallback,
+            appearanceNotificationName.rawValue as CFString,
+            nil,
+            .deliverImmediately
+        )
+        log("registered darwin notification")
     }
 
     @objc func appearanceChanged(_ notification: Notification) {
+        log("appearance change received")
         // Small delay to ensure appearance change is fully propagated
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.reloadTmuxTheme()
+        debounceWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.reloadTmuxTheme()
         }
+        debounceWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: workItem)
     }
 
     func reloadTmuxTheme() {
         let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/Users/Morriz/.local/bin/appearance")
+        let appearanceURL = URL(fileURLWithPath: "/Users/Morriz/.local/bin/appearance")
+        task.executableURL = appearanceURL
         task.arguments = ["reload"]
+        var env = ProcessInfo.processInfo.environment
+        env["APPEARANCE_LOG"] = "1"
+        let logURL = appearanceURL.resolvingSymlinksInPath()
+            .deletingLastPathComponent()
+            .appendingPathComponent("appearance.log")
+        env["APPEARANCE_LOG_FILE"] = logURL.path
+        task.environment = env
 
         do {
+            log("running appearance reload")
             try task.run()
             task.waitUntilExit()
+            log("appearance reload exited status=\(task.terminationStatus)")
         } catch {
-            // Silently ignore errors
+            log("appearance reload failed error=\(error)")
         }
     }
 }

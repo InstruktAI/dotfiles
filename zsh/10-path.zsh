@@ -23,3 +23,6 @@ fi
 
 # Source machine-specific paths
 [[ -r "${0:h}/10-path.local.zsh" ]] && source "${0:h}/10-path.local.zsh"
+
+# custom npm global before brew
+prepend_path "$HOME/.npm-global/bin"
