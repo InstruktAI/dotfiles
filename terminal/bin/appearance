@@ -399,21 +399,8 @@ def cmd_reload() -> int:
             check=False,
         )
 
-    sessions = tmux_sessions()
-    log(f"reload tmux sessions: {' '.join(sessions)}")
-    for session in sessions:
-        if re.match(r"^tc_[a-f0-9]+$", session):
-            transparent = f"fg={colors['tui_status_fg']},bg={colors['terminal_bg']}"
-            log(f"reload tmux inner session={session} applying transparent status")
-            tmux_command(["set", "-t", session, "status-style", transparent])
-            tmux_command(["set", "-t", session, "status-left-style", transparent])
-            tmux_command(["set", "-t", session, "status-right-style", transparent])
-            tmux_command(["set", "-t", session, "message-style", transparent])
-            tmux_command(["setw", "-t", session, "window-status-style", transparent])
-            tmux_command(["setw", "-t", session, "window-status-current-style", transparent])
-            tmux_command(["set", "-t", session, "status-right", ""])
-            tmux_command(["set", "-t", session, "status-right-length", "0"])
-            tmux_command(["set", "-t", session, "status-left-length", "40"])
+    # Note: tc_* session status bars are managed by TeleClaude TUI (receives SIGUSR1)
+    # Do not override them here - let TUI apply agent-colored status bars
 
     update_gemini_theme(colors["mode"])
     update_claude_theme(colors["mode"])
@@ -443,15 +430,8 @@ def cmd_focus_pane(pane_pid: str) -> int:
     except Exception:
         pass
 
-    for session in tmux_sessions():
-        if not re.match(r"^tc_[a-f0-9]+$", session):
-            continue
-        if session == active_session:
-            style = f"fg={colors['tui_status_fg']},bg={colors['terminal_bg']}"
-        else:
-            style = f"fg={colors['tui_status_fg']},bg={colors['focus_dim']}"
-        tmux_command(["set", "-t", session, "status-style", style])
-
+    # Note: tc_* sessions manage their own status bars (handled by TeleClaude TUI)
+    # Do not override them here
     return 0
 
 
