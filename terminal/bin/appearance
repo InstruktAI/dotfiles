@@ -17,7 +17,6 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 
@@ -40,7 +39,9 @@ APPEARANCE_FOCUS_DIM_PERCENT = int_env("APPEARANCE_FOCUS_DIM_PERCENT", 5)
 APPEARANCE_LATITUDE = os.environ.get("APPEARANCE_LATITUDE", "52.37")
 APPEARANCE_LONGITUDE = os.environ.get("APPEARANCE_LONGITUDE", "4.89")
 APPEARANCE_LOG = os.environ.get("APPEARANCE_LOG", "1")
-APPEARANCE_LOG_FILE = os.environ.get("APPEARANCE_LOG_FILE", str(SCRIPT_DIR / "appearance.log"))
+APPEARANCE_LOG_FILE = os.environ.get(
+    "APPEARANCE_LOG_FILE", str(SCRIPT_DIR / "appearance.log")
+)
 
 DEFAULT_PATH_PREFIX = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 os.environ["PATH"] = f"{DEFAULT_PATH_PREFIX}:{os.environ.get('PATH', '')}"
@@ -61,7 +62,9 @@ def is_macos() -> bool:
     return sys.platform == "darwin"
 
 
-def run_command(args: list[str], check: bool = False) -> subprocess.CompletedProcess[str]:
+def run_command(
+    args: list[str], check: bool = False
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(args, check=check, capture_output=True, text=True)
 
 
@@ -198,7 +201,9 @@ def get_terminal_bg_from_iterm(is_dark: bool) -> Optional[str]:
     if profile is None:
         profile = bookmarks[0]
 
-    uses_separate = bool(profile.get("Use Separate Colors for Light and Dark Mode", False))
+    uses_separate = bool(
+        profile.get("Use Separate Colors for Light and Dark Mode", False)
+    )
     if uses_separate:
         mode_suffix = "Dark" if is_dark else "Light"
         key = f"Background Color ({mode_suffix})"
@@ -264,23 +269,30 @@ def compute_colors() -> Optional[Dict[str, str]]:
     return {
         "mode": mode,
         "terminal_bg": terminal_bg,
-        "inactive_bg": blend_hex(terminal_bg, blend_target, APPEARANCE_INACTIVE_BG_PERCENT),
+        "inactive_bg": blend_hex(
+            terminal_bg, blend_target, APPEARANCE_INACTIVE_BG_PERCENT
+        ),
         "status_bg": blend_hex(terminal_bg, blend_target, APPEARANCE_STATUS_BG_PERCENT),
         "status_fg": blend_hex(terminal_bg, blend_target, APPEARANCE_STATUS_FG_PERCENT),
-        "tui_status_fg": blend_hex(terminal_bg, blend_target, APPEARANCE_TUI_STATUS_FG_PERCENT),
+        "tui_status_fg": blend_hex(
+            terminal_bg, blend_target, APPEARANCE_TUI_STATUS_FG_PERCENT
+        ),
         "focus_dim": blend_hex(terminal_bg, blend_target, APPEARANCE_FOCUS_DIM_PERCENT),
     }
 
 
 def write_tmux_theme(colors: Dict[str, str]) -> None:
+    # Keep global tmux styling neutral: let each user's terminal profile define
+    # backgrounds and foreground defaults. TeleClaude TUI applies its own local
+    # accents when needed.
     theme = (
-        f"set -g pane-border-style \"fg={colors['terminal_bg']},bg={colors['terminal_bg']}\"\n"
-        f"set -g pane-active-border-style \"fg={colors['terminal_bg']},bg={colors['terminal_bg']}\"\n"
-        f"set -g window-style \"bg={colors['inactive_bg']}\"\n"
-        "set -g window-active-style \"bg=terminal\"\n"
-        f"set -g status-style \"fg={colors['status_fg']},bg={colors['status_bg']}\"\n"
-        f"set -g status-left-style \"fg={colors['status_fg']},bg={colors['status_bg']}\"\n"
-        f"set -g status-right-style \"fg={colors['status_fg']},bg={colors['status_bg']}\"\n"
+        'set -g pane-border-style "default"\n'
+        'set -g pane-active-border-style "default"\n'
+        'set -g window-style "bg=terminal"\n'
+        'set -g window-active-style "bg=terminal"\n'
+        'set -g status-style "default"\n'
+        'set -g status-left-style "default"\n'
+        'set -g status-right-style "default"\n'
     )
     Path(APPEARANCE_THEME_FILE).write_text(theme, encoding="utf-8")
     log(f"tmux-theme wrote {APPEARANCE_THEME_FILE}")
@@ -302,7 +314,7 @@ def update_gemini_theme(mode: str) -> None:
     if not settings_path.exists():
         return
 
-    theme = "Default" if mode == "dark" else "Default Light"
+    theme = "Default" if mode == "dark" else "GitHub Light"
     log(f"reload gemini theme={theme} file={settings_path}")
     try:
         data = json.loads(settings_path.read_text(encoding="utf-8"))
@@ -347,7 +359,9 @@ def cmd_get_terminal_bg() -> int:
 def cmd_tmux_theme() -> int:
     colors = compute_colors()
     if not colors:
-        print("Cannot generate theme - no terminal background available", file=sys.stderr)
+        print(
+            "Cannot generate theme - no terminal background available", file=sys.stderr
+        )
         log("tmux-theme compute_colors failed")
         return 1
     write_tmux_theme(colors)
