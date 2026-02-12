@@ -309,27 +309,96 @@ def tmux_sessions() -> list[str]:
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
+def _normalize_mode(value: object) -> str | None:
+    if isinstance(value, str) and value in {"dark", "light"}:
+        return value
+    return None
+
+
+def _normalize_theme(value: object) -> str | None:
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped:
+            return stripped
+    return None
+
+
+def _apply_mode_theme_memory(
+    *,
+    data: dict[str, object],
+    mode: str,
+    current_theme: str | None,
+    set_theme: callable,
+    app_key: str,
+) -> None:
+    memory_raw = data.get("_teleclaude_theme_memory")
+    memory: dict[str, object]
+    if isinstance(memory_raw, dict):
+        memory = memory_raw
+    else:
+        memory = {}
+        data["_teleclaude_theme_memory"] = memory
+
+    app_raw = memory.get(app_key)
+    app_memory: dict[str, object]
+    if isinstance(app_raw, dict):
+        app_memory = app_raw
+    else:
+        app_memory = {}
+        memory[app_key] = app_memory
+
+    last_mode = _normalize_mode(app_memory.get("last_mode"))
+    remembered_dark = _normalize_theme(app_memory.get("dark"))
+    remembered_light = _normalize_theme(app_memory.get("light"))
+
+    if last_mode == mode:
+        # Mode unchanged: treat current setting as user truth and keep memory fresh.
+        if current_theme:
+            app_memory[mode] = current_theme
+    else:
+        # Mode changed: snapshot previous mode's explicit theme first.
+        if last_mode and current_theme:
+            app_memory[last_mode] = current_theme
+
+        target_theme = remembered_dark if mode == "dark" else remembered_light
+        if target_theme:
+            set_theme(target_theme)
+            app_memory[mode] = target_theme
+        # If target mode has no memory yet, do not infer from carried-over theme.
+        # The next manual change in this mode will be captured when mode is unchanged.
+    app_memory["last_mode"] = mode
+
+
 def update_gemini_theme(mode: str) -> None:
     settings_path = Path.home() / ".gemini" / "settings.json"
     if not settings_path.exists():
         return
 
-    theme = "Default" if mode == "dark" else "GitHub Light"
-    log(f"reload gemini theme={theme} file={settings_path}")
     try:
         data = json.loads(settings_path.read_text(encoding="utf-8"))
         ui = data.get("ui")
         if not isinstance(ui, dict):
             ui = {}
             data["ui"] = ui
-        ui["theme"] = theme
+        current_theme = _normalize_theme(ui.get("theme"))
+
+        def _set_theme(theme_name: str) -> None:
+            ui["theme"] = theme_name
+
+        _apply_mode_theme_memory(
+            data=data,
+            mode=mode,
+            current_theme=current_theme,
+            set_theme=_set_theme,
+            app_key="gemini",
+        )
         settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        log(f"reload gemini theme synced via mode-memory file={settings_path} mode={mode}")
     except Exception as exc:
         log(f"reload gemini theme failed error={exc}")
 
 
 def update_claude_theme(mode: str) -> None:
-    theme = "dark" if mode == "dark" else "light"
     settings_paths = [
         Path.home() / ".claude" / "settings.json",
         Path.home() / ".claude.json",
@@ -339,11 +408,25 @@ def update_claude_theme(mode: str) -> None:
         if not settings_path.exists():
             continue
 
-        log(f"reload claude theme={theme} file={settings_path}")
         try:
             data = json.loads(settings_path.read_text(encoding="utf-8"))
-            data["theme"] = theme
+            current_theme = _normalize_theme(data.get("theme"))
+
+            def _set_theme(theme_name: str) -> None:
+                data["theme"] = theme_name
+
+            _apply_mode_theme_memory(
+                data=data,
+                mode=mode,
+                current_theme=current_theme,
+                set_theme=_set_theme,
+                app_key="claude",
+            )
             settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+            log(
+                "reload claude theme synced via mode-memory "
+                f"file={settings_path} mode={mode}"
+            )
         except Exception as exc:
             log(f"reload claude theme failed file={settings_path} error={exc}")
 
