@@ -329,18 +329,23 @@ def update_gemini_theme(mode: str) -> None:
 
 
 def update_claude_theme(mode: str) -> None:
-    settings_path = Path.home() / ".claude.json"
-    if not settings_path.exists():
-        return
-
     theme = "dark" if mode == "dark" else "light"
-    log(f"reload claude theme={theme} file={settings_path}")
-    try:
-        data = json.loads(settings_path.read_text(encoding="utf-8"))
-        data["theme"] = theme
-        settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-    except Exception as exc:
-        log(f"reload claude theme failed error={exc}")
+    settings_paths = [
+        Path.home() / ".claude" / "settings.json",
+        Path.home() / ".claude.json",
+    ]
+
+    for settings_path in settings_paths:
+        if not settings_path.exists():
+            continue
+
+        log(f"reload claude theme={theme} file={settings_path}")
+        try:
+            data = json.loads(settings_path.read_text(encoding="utf-8"))
+            data["theme"] = theme
+            settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        except Exception as exc:
+            log(f"reload claude theme failed file={settings_path} error={exc}")
 
 
 def cmd_get_mode() -> int:
@@ -371,6 +376,11 @@ def cmd_tmux_theme() -> int:
 def cmd_reload() -> int:
     mode = get_mode()
     log(f"reload start pid={os.getpid()} mode={mode}")
+
+    # Always sync agent CLI themes on mode changes, even when tmux color
+    # computation cannot run (e.g. missing terminal background probe).
+    update_gemini_theme(mode)
+    update_claude_theme(mode)
 
     colors = compute_colors()
     if not colors:
@@ -416,8 +426,6 @@ def cmd_reload() -> int:
     # Note: tc_* session status bars are managed by TeleClaude TUI (receives SIGUSR1)
     # Do not override them here - let TUI apply agent-colored status bars
 
-    update_gemini_theme(colors["mode"])
-    update_claude_theme(colors["mode"])
     log("reload complete")
     return 0
 
