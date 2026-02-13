@@ -9,5 +9,8 @@
 # History/backup folders
 .history/
 
+# Python bytecode
+__pycache__/
+
 # Appearance logs
 terminal/bin/appearance.log

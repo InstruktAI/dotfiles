@@ -50,7 +50,7 @@ echo ""
 echo "=== Terminal ==="
 mkdir -p "$HOME/.local/bin"
 
-link "$DOTFILES/terminal/bin/appearance" "$HOME/.local/bin/appearance"
+link "$DOTFILES/terminal/bin/appearance.py" "$HOME/.local/bin/appearance"
 link "$DOTFILES/terminal/tmux.conf" "$HOME/.tmux.conf"
 
 # macOS-specific: appearance-watcher binary and launchd

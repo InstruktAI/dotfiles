@@ -1,26 +1,11 @@
 #!/usr/bin/env swift
 // Watches for macOS appearance changes and reloads tmux theme
-// Compile: swiftc -o appearance-watcher appearance-watcher.swift
+// Compile: swiftc -O -o appearance-watcher appearance-watcher.swift
 // Or run directly: swift appearance-watcher.swift
 
 import Cocoa
-import Darwin
 
-private let appearanceNotificationName = NSNotification.Name("AppleInterfaceThemeChangedNotification")
-
-private func appearanceDarwinCallback(
-    _ center: CFNotificationCenter?,
-    _ observer: UnsafeMutableRawPointer?,
-    _ name: CFNotificationName?,
-    _ object: UnsafeRawPointer?,
-    _ userInfo: CFDictionary?
-) {
-    guard let observer = observer else { return }
-    let watcher = Unmanaged<AppearanceWatcher>.fromOpaque(observer).takeUnretainedValue()
-    watcher.appearanceChanged(Notification(name: appearanceNotificationName))
-}
-
-class AppearanceWatcher {
+class AppearanceWatcher: NSObject, NSApplicationDelegate {
     private let logDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
@@ -29,6 +14,7 @@ class AppearanceWatcher {
 
     private var debounceWorkItem: DispatchWorkItem?
     private var lastKnownMode: String?
+    private var observation: NSKeyValueObservation?
 
     private func log(_ message: String) {
         let ts = logDateFormatter.string(from: Date())
@@ -36,95 +22,45 @@ class AppearanceWatcher {
         fflush(stdout)
     }
 
-    init() {
-        log("started")
-        lastKnownMode = detectMode()
-        if let mode = lastKnownMode {
-            log("initial mode=\(mode)")
-        } else {
-            log("initial mode=unknown")
-        }
-        DistributedNotificationCenter.default.addObserver(
-            self,
-            selector: #selector(appearanceChanged),
-            name: appearanceNotificationName,
-            object: nil
-        )
-        log("registered distributed notification")
-
-        let darwinCenter = CFNotificationCenterGetDarwinNotifyCenter()
-        let observer = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
-        CFNotificationCenterAddObserver(
-            darwinCenter,
-            observer,
-            appearanceDarwinCallback,
-            appearanceNotificationName.rawValue as CFString,
-            nil,
-            .deliverImmediately
-        )
-        log("registered darwin notification")
+    private func currentMode() -> String {
+        let appearance = NSApp.effectiveAppearance
+        let match = appearance.bestMatch(from: [.darkAqua, .aqua])
+        return match == .darkAqua ? "dark" : "light"
     }
 
-    @objc func appearanceChanged(_ notification: Notification) {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        log("started")
+        lastKnownMode = currentMode()
+        log("initial mode=\(lastKnownMode!)")
+
+        observation = NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in
+            self?.appearanceChanged()
+        }
+        log("registered appearance observer (KVO)")
+    }
+
+    private func appearanceChanged() {
         log("appearance change received")
-        // Debounce bursty notifications and resolve the post-switch mode before reload.
         debounceWorkItem?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
-            self?.reloadWithResolvedMode()
+            self?.handleChange()
         }
         debounceWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: workItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
     }
 
-    private func detectMode() -> String? {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/Users/Morriz/.local/bin/appearance")
-        task.arguments = ["get-mode"]
-
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = Pipe()
-        do {
-            try task.run()
-            task.waitUntilExit()
-            guard task.terminationStatus == 0 else { return nil }
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let text = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard let mode = text, mode == "dark" || mode == "light" else { return nil }
-            return mode
-        } catch {
-            return nil
+    private func handleChange() {
+        let mode = currentMode()
+        log("resolved mode=\(mode)")
+        if mode == lastKnownMode {
+            log("mode unchanged, skipping")
+            return
         }
+        reload(mode: mode)
+        lastKnownMode = mode
     }
 
-    private func resolveModeAfterChange() -> String? {
-        // Mode propagation can lag the notification; wait briefly for it to settle.
-        let previous = lastKnownMode
-        var observed: String?
-        for _ in 0..<12 {
-            observed = detectMode()
-            if let mode = observed, mode != previous {
-                return mode
-            }
-            usleep(250_000)
-        }
-        return observed
-    }
-
-    private func reloadWithResolvedMode() {
-        let resolvedMode = resolveModeAfterChange()
-        if let resolvedMode {
-            log("resolved mode=\(resolvedMode)")
-        } else {
-            log("resolved mode=unknown")
-        }
-        reloadTmuxTheme(modeOverride: resolvedMode)
-        if let resolvedMode {
-            lastKnownMode = resolvedMode
-        }
-    }
-
-    func reloadTmuxTheme(modeOverride: String?) {
+    private func reload(mode: String) {
         let task = Process()
         let appearanceURL = URL(fileURLWithPath: "/Users/Morriz/.local/bin/appearance")
         task.executableURL = appearanceURL
@@ -135,17 +71,11 @@ class AppearanceWatcher {
             .deletingLastPathComponent()
             .appendingPathComponent("appearance.log")
         env["APPEARANCE_LOG_FILE"] = logURL.path
-        if let modeOverride {
-            env["APPEARANCE_MODE"] = modeOverride
-        }
+        env["APPEARANCE_MODE"] = mode
         task.environment = env
 
         do {
-            if let modeOverride {
-                log("running appearance reload mode=\(modeOverride)")
-            } else {
-                log("running appearance reload")
-            }
+            log("running appearance reload mode=\(mode)")
             try task.run()
             task.waitUntilExit()
             log("appearance reload exited status=\(task.terminationStatus)")
@@ -155,7 +85,9 @@ class AppearanceWatcher {
     }
 }
 
-// Create watcher and run forever
-let watcher = AppearanceWatcher()
+let app = NSApplication.shared
+app.setActivationPolicy(.accessory)
+let delegate = AppearanceWatcher()
+app.delegate = delegate
 print("Watching for appearance changes... (Ctrl+C to stop)")
-RunLoop.main.run()
+app.run()

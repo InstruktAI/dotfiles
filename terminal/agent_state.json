@@ -1,0 +1,12 @@
+{
+  "claude": {
+    "dark": "dark",
+    "light": "light",
+    "last_mode": "dark"
+  },
+  "gemini": {
+    "dark": "Default",
+    "light": "Default Light",
+    "last_mode": "dark"
+  }
+}

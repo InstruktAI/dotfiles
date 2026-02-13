@@ -57,10 +57,10 @@ alias killdock="killall Dock"
 alias killmenubar="killall SystemUIServer NotificationCenter"
 
 # Workspaces
-alias cdw="cd ~/Documents/Workspace"
-alias cdi="cd ~/Documents/Workspace/InstruktAI"
-alias cdm="cd ~/Documents/Workspace/morriz"
-alias cds="cd ~/Documents/Workspace/StadsAvonturen"
+alias cdw="cd ~/Workspace"
+alias cdi="cd ~/Workspace/InstruktAI"
+alias cdm="cd ~/Workspace/morriz"
+alias cds="cd ~/Workspace/StadsAvonturen"
 
 # Agents
 alias cc="claude --dangerously-skip-permissions"
