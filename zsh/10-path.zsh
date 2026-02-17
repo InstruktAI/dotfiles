@@ -3,9 +3,6 @@
 
 typeset -U path
 
-# Python venv shortcuts (works everywhere)
-prepend_path ".venv/bin"
-
 # User-local bins (universal)
 prepend_path "$HOME/.local/bin"
 prepend_path "$HOME/.cargo/bin"

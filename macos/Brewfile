@@ -1,0 +1,67 @@
+# Dotfiles Brewfile - curated core tools
+# Install: brew bundle --file=macos/Brewfile --no-lock
+
+tap "homebrew/bundle"
+tap "homebrew/services"
+
+# --- Shell & Terminal ---
+brew "bash-completion@2"
+brew "coreutils"
+brew "findutils"
+brew "gnu-sed"
+brew "gnu-tar"
+brew "grep"
+brew "make"
+brew "moreutils"
+brew "vim"
+brew "tmux"
+brew "reattach-to-user-namespace"
+
+# --- Dev Tools ---
+brew "git"
+brew "git-extras"
+brew "git-lfs"
+brew "gh"
+brew "jq"
+brew "yq"
+brew "shellcheck"
+brew "shfmt"
+brew "tree"
+brew "fd"
+brew "eza"
+brew "glow"
+
+# --- Network & HTTP ---
+brew "httpie"
+brew "wget"
+brew "nmap"
+brew "ssh-copy-id"
+brew "watch"
+
+# --- Languages & Package Managers ---
+brew "go"
+brew "uv"
+brew "pnpm"
+brew "pipx"
+
+# --- Media & Documents ---
+brew "ffmpeg"
+brew "imagemagick"
+brew "poppler"
+brew "yt-dlp"
+
+# --- Security & Encryption ---
+brew "age"
+brew "sops"
+brew "pinentry-mac"
+
+# --- System ---
+brew "dockutil"
+brew "syncthing"
+brew "mackup"
+
+# --- Casks ---
+cask "docker-desktop"
+cask "handy"
+cask "ngrok"
+cask "vlc"
