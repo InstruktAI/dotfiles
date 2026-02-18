@@ -194,13 +194,10 @@ defaults write com.apple.TextEdit PlainTextEncodingForWrite -int 4
 defaults write com.apple.appstore WebKitDeveloperExtras -bool true
 
 # =============================================================================
-# Locale (NL)
+# Locale (machine-specific — override in defaults.local.sh)
 # =============================================================================
 
-defaults write NSGlobalDomain AppleLanguages -array "en-NL" "nl-NL"
-defaults write NSGlobalDomain AppleLocale -string "nl_NL@currency=EUR"
-defaults write NSGlobalDomain AppleMeasurementUnits -string "Centimeters"
-defaults write NSGlobalDomain AppleMetricUnits -bool true
+[[ -r "${BASH_SOURCE[0]%/*}/defaults.local.sh" ]] && source "${BASH_SOURCE[0]%/*}/defaults.local.sh"
 
 # =============================================================================
 # Restart affected applications

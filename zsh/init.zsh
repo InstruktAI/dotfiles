@@ -48,11 +48,8 @@ if (( $+functions[compinit] )); then
   autoload -Uz compinit && compinit -C
 fi
 
-# 4. Source completion scripts that use compdef (MUST be after compinit).
-#    These scripts call `compdef _func command` which requires compinit to
-#    have already initialized the completion system.
-[[ -r "$HOME/Workspace/InstruktAI/TeleClaude/bin/telec-completion.zsh" ]] && \
-    source "$HOME/Workspace/InstruktAI/TeleClaude/bin/telec-completion.zsh"
+# 4. Source machine-specific post-compinit scripts (compdef registrations, etc.)
+[[ -r "${0:h}/init.local.zsh" ]] && source "${0:h}/init.local.zsh"
 
 # Clean up variables
 unset ZSH_CONFIG_DIR config_file

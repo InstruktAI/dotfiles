@@ -62,7 +62,7 @@ class AppearanceWatcher: NSObject, NSApplicationDelegate {
 
     private func reload(mode: String) {
         let task = Process()
-        let appearanceURL = URL(fileURLWithPath: "/Users/Morriz/.local/bin/appearance")
+        let appearanceURL = URL(fileURLWithPath: NSHomeDirectory() + "/.local/bin/appearance")
         task.executableURL = appearanceURL
         task.arguments = ["reload"]
         var env = ProcessInfo.processInfo.environment

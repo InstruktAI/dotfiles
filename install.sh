@@ -62,7 +62,7 @@ if [[ "$OS" == "Darwin" ]]; then
     plist_dst="$HOME/Library/LaunchAgents/ai.instrukt.appearance-watcher.plist"
 
     mkdir -p "$HOME/Library/LaunchAgents"
-    sed "s|/Users/Morriz|$HOME|g" "$plist_src" > "$plist_dst"
+    sed "s|__HOME__|$HOME|g" "$plist_src" > "$plist_dst"
     echo "  [COPY] $plist_dst"
 
     # Load launchd job

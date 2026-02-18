@@ -56,14 +56,11 @@ alias killfinder="killall Finder"
 alias killdock="killall Dock"
 alias killmenubar="killall SystemUIServer NotificationCenter"
 
-# Workspaces
-alias cdw="cd ~/Workspace"
-alias cdi="cd ~/Workspace/InstruktAI"
-alias cdm="cd ~/Workspace/morriz"
-alias cds="cd ~/Workspace/StadsAvonturen"
-
 # Agents
 alias cc="claude --dangerously-skip-permissions"
 alias cdx="codex --dangerously-bypass-approvals-and-sandbox --search"
 alias gg="gemini --yolo"
+
+# Source machine-specific aliases
+[[ -r "${0:h}/30-aliases.local.zsh" ]] && source "${0:h}/30-aliases.local.zsh"
 
