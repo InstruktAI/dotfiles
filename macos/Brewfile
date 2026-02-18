@@ -28,7 +28,10 @@ brew "shellcheck"
 brew "shfmt"
 brew "tree"
 brew "fd"
+brew "fzf"
+brew "ripgrep"
 brew "eza"
+brew "direnv"
 brew "glow"
 
 # --- Network & HTTP ---
@@ -38,8 +41,9 @@ brew "nmap"
 brew "ssh-copy-id"
 brew "watch"
 
-# --- Languages & Package Managers ---
+# --- Languages & Runtimes ---
 brew "go"
+brew "node"
 brew "uv"
 brew "pnpm"
 brew "pipx"
@@ -63,5 +67,8 @@ brew "mackup"
 # --- Casks ---
 cask "docker-desktop"
 cask "handy"
+cask "iterm2"
 cask "ngrok"
+cask "raycast"
+cask "visual-studio-code"
 cask "vlc"

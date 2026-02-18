@@ -38,6 +38,14 @@ else
     echo "[OK] Oh My Zsh already installed"
 fi
 
+# ─── Bun ──────────────────────────────────────────────────────────────────
+if ! command -v bun &>/dev/null; then
+    echo "Installing Bun..."
+    curl -fsSL https://bun.sh/install | bash
+else
+    echo "[OK] Bun already installed"
+fi
+
 # ─── Main installer (symlinks) ─────────────────────────────────────────────
 echo ""
 "$DOTFILES/install.sh"
