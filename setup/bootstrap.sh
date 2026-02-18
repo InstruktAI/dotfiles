@@ -46,6 +46,19 @@ else
     echo "[OK] Bun already installed"
 fi
 
+# ─── Local config templates ───────────────────────────────────────────────
+echo ""
+echo "=== Local Config ==="
+for example in "$DOTFILES"/**/*.local.example; do
+    local_file="${example%.example}"
+    if [[ ! -f "$local_file" ]]; then
+        cp "$example" "$local_file"
+        echo "  [NEW] ${local_file#$DOTFILES/} (customize to your machine)"
+    else
+        echo "  [OK] ${local_file#$DOTFILES/}"
+    fi
+done
+
 # ─── Main installer (symlinks) ─────────────────────────────────────────────
 echo ""
 "$DOTFILES/install.sh"
