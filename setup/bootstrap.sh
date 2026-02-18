@@ -49,7 +49,7 @@ fi
 # ─── Local config templates ───────────────────────────────────────────────
 echo ""
 echo "=== Local Config ==="
-for example in "$DOTFILES"/**/*.local.example; do
+for example in "$DOTFILES"/**/*.example; do
     local_file="${example%.example}"
     if [[ ! -f "$local_file" ]]; then
         cp "$example" "$local_file"
