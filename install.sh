@@ -53,8 +53,16 @@ mkdir -p "$HOME/.local/bin"
 link "$DOTFILES/terminal/bin/appearance.py" "$HOME/.local/bin/appearance"
 link "$DOTFILES/terminal/tmux.conf" "$HOME/.tmux.conf"
 
-# macOS-specific: appearance-watcher binary and launchd
+# macOS-specific
 if [[ "$OS" == "Darwin" ]]; then
+    # iTerm2: load preferences from dotfiles
+    if [[ -d "$DOTFILES/iterm2" ]]; then
+        defaults write com.googlecode.iterm2 PrefsCustomFolder -string "$DOTFILES/iterm2"
+        defaults write com.googlecode.iterm2 LoadPrefsFromCustomFolder -bool true
+        echo "  [OK] iTerm2 prefs -> $DOTFILES/iterm2"
+    fi
+
+    # appearance-watcher binary and launchd
     link "$DOTFILES/terminal/bin/appearance-watcher" "$HOME/.local/bin/appearance-watcher"
 
     # Install launchd plist (copy, not symlink - launchd prefers this)
