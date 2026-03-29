@@ -32,7 +32,7 @@ fi
 if [[ -d "$HOME/.bun" ]]; then
     export BUN_INSTALL="$HOME/.bun"
     [[ -r "$HOME/.bun/_bun" ]] && source "$HOME/.bun/_bun"
-    prepend_path "$BUN_INSTALL/bin"
+    append_path "$BUN_INSTALL/bin"
 fi
 
 # Source machine-specific tools

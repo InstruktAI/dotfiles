@@ -4,10 +4,10 @@ is_executable() {
   command -v "$1" >/dev/null 2>&1
 }
 
-prepend_path() {
+append_path() {
   [[ -d "$1" ]] || return 0
   typeset -gU path
-  path=("$1" $path)
+  path=($path "$1")
 }
 
 is_supported() {

@@ -2,7 +2,7 @@
 
 # Ensure Docker CLI is discoverable early (oh-my-zsh docker plugin checks this on load).
 if [[ -x "/Applications/Docker.app/Contents/Resources/bin/docker" ]]; then
-  export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
+  append_path "/Applications/Docker.app/Contents/Resources/bin"
 fi
 
 # Custom completions directory (generated / local overrides).
