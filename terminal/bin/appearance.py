@@ -406,20 +406,23 @@ def cmd_reload() -> int:
     tmux_command(["set", "-g", "@appearance_mode", mode])
 
     # Notify TeleClaude TUI to refresh colors.
-    pgrep = subprocess.run(
-        ["/usr/bin/pgrep", "-f", "teleclaude.cli.telec"],
+    # The TUI runs as the first pane in the tc_tui tmux session.
+    # tmux tracks the pane PID directly — no process name guessing.
+    tui_panes = subprocess.run(
+        ["tmux", "list-panes", "-t", "tc_tui", "-F", "#{pane_pid}"],
         capture_output=True,
         text=True,
         check=False,
     )
-    pids = [pid for pid in pgrep.stdout.split() if pid.isdigit()]
-    for pid in pids:
-        subprocess.run(
-            ["/bin/kill", "-USR1", pid],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+    if tui_panes.returncode == 0:
+        pids = tui_panes.stdout.strip().split("\n")
+        if pids and pids[0].isdigit():
+            subprocess.run(
+                ["/bin/kill", "-USR1", pids[0]],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
 
     log("reload complete")
     return 0
