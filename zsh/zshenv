@@ -8,11 +8,15 @@
 # Keep this minimal and non-interactive-safe: PATH only, no compinit, no prompt.
 # Interactive shells re-run these via .zshrc -> init.zsh; append_path uses
 # `typeset -U path`, so re-sourcing is idempotent.
+#
+# CRITICAL: do NOT set ZDOTDIR here. ZDOTDIR set in .zshenv redirects zsh's
+# lookup of .zprofile/.zshrc/.zlogin to that directory, which skips the user's
+# ~/.zshrc (and its oh-my-zsh setup). Source the path modules by explicit path.
 
-export ZDOTDIR="${ZDOTDIR:-$HOME/.config/zsh}"
-
-[[ -r "$ZDOTDIR/00-helpers.zsh" ]] && source "$ZDOTDIR/00-helpers.zsh"
-[[ -r "$ZDOTDIR/10-path.zsh" ]] && source "$ZDOTDIR/10-path.zsh"
+_tc_zsh_dir="$HOME/.config/zsh"
+[[ -r "$_tc_zsh_dir/00-helpers.zsh" ]] && source "$_tc_zsh_dir/00-helpers.zsh"
+[[ -r "$_tc_zsh_dir/10-path.zsh" ]] && source "$_tc_zsh_dir/10-path.zsh"
+unset _tc_zsh_dir
 
 # Rust toolchain (defines cargo env; also adds ~/.cargo/bin)
 [[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
