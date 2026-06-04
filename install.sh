@@ -42,6 +42,9 @@ link() {
 # =============================================================================
 echo "=== ZSH ==="
 link "$DOTFILES/zsh" "$HOME/.config/zsh"
+# .zshenv is sourced for non-interactive ssh shells; without it PATH (Homebrew,
+# toolchains) is missing for cross-computer tmux attach and other ssh-invoked tools.
+link "$DOTFILES/zsh/zshenv" "$HOME/.zshenv"
 
 # =============================================================================
 # Terminal / Appearance
