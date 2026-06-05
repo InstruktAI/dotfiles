@@ -59,8 +59,8 @@ alias killmenubar="killall SystemUIServer NotificationCenter"
 # Agents
 alias cc="claude --dangerously-skip-permissions"
 alias cdx="codex --dangerously-bypass-approvals-and-sandbox --search"
-alias gg="gemini --yolo"
+alias gg="gemini --approval-mode=yolo"
+alias ag="agy --dangerously-skip-permissions"
 
 # Source machine-specific aliases
 [[ -r "${0:h}/30-aliases.local.zsh" ]] && source "${0:h}/30-aliases.local.zsh"
-

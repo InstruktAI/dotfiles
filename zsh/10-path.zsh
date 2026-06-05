@@ -19,9 +19,14 @@ if [[ -d "/opt/homebrew/bin" ]]; then
     append_path "/opt/homebrew/bin"
     append_path "/opt/homebrew/sbin"
 fi
+if [[ -d "/opt/homebrew/opt/node@24/bin" ]]; then
+    append_path "/opt/homebrew/opt/node@24/bin"
+fi
+
 if [[ -d "/home/linuxbrew/.linuxbrew/bin" ]]; then
     append_path "/home/linuxbrew/.linuxbrew/bin"
 fi
+
 
 # Tier 4 — Machine-specific paths
 [[ -r "${0:h}/10-path.local.zsh" ]] && source "${0:h}/10-path.local.zsh"
