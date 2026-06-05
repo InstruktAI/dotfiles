@@ -2,11 +2,19 @@
   "claude": {
     "dark": "dark",
     "light": "light",
-    "last_mode": "light"
+    "last_mode": "dark",
+    "last_applied": "dark"
   },
   "gemini": {
-    "dark": "Default",
-    "light": "Default Light",
-    "last_mode": "light"
+    "dark": "dark",
+    "light": "light",
+    "last_mode": "dark",
+    "last_applied": "dark"
+  },
+  "codex": {
+    "dark": "one-half-dark",
+    "light": "one-half-light",
+    "last_mode": "dark",
+    "last_applied": "one-half-dark"
   }
 }

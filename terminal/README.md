@@ -8,7 +8,7 @@ Cross-platform terminal/tmux appearance management with automatic dark/light mod
 - **Terminal background detection**: Reads iTerm2 configuration on macOS
 - **Environment passthrough**: Host passes settings to remote sessions via SSH
 - **tmux theming**: Dynamic borders, status bar, and pane styling
-- **CLI theme sync**: Updates Claude CLI and Gemini CLI themes
+- **CLI theme sync**: Updates Claude, Antigravity CLI, and Codex themes
 
 ## Installation
 
@@ -47,6 +47,54 @@ ssh user@remote
 
 TeleClaude does this automatically in `pane_manager.py`.
 
+### Agent CLI Theme Sync
+
+`appearance reload` is imperative and idempotent. The current appearance mode is
+the input, the agent table in `bin/appearance.py` defines the intended config
+value for that mode, and each run writes that intended value. Re-running reload
+for the same mode must converge to the same files even if a previous run, a
+sync conflict, or a manual edit left stale state behind.
+
+Per-agent preference memory may exist, but it is not authoritative. State may
+only remember a user preference when the current agent config differs from the
+last value that `appearance reload` applied. That proves the user or the agent
+changed the theme outside the sync path. On the next reload, the script records
+that external change as the preference for the mode that was active when the
+last value was applied, then writes the intended value for the newly detected
+mode.
+
+The state record must therefore track both preference and provenance:
+
+```json
+{
+  "agent": {
+    "dark": "dark-preference",
+    "light": "light-preference",
+    "last_mode": "dark",
+    "last_applied": "dark-preference"
+  }
+}
+```
+
+The synced settings locations are declared in the `AGENTS` table in
+`bin/appearance.py`:
+
+| Agent | Settings file | Theme field |
+|-------|---------------|-------------|
+| Claude | `~/.claude/settings.json` | `theme` |
+| Claude | `~/.claude.json` | `theme` |
+| Antigravity CLI | `~/.gemini/antigravity-cli/settings.json` | `colorScheme` |
+| Codex | `~/.codex/config.toml` | `[tui].theme` |
+
+Preference memory and last-applied provenance live in
+`terminal/agent_state.json`.
+
+This contract applies to every synced agent. For each agent, mode-only fields
+that accept only `dark` or `light` write the current mode directly and do not
+learn arbitrary preferences. Agents with real named themes may use preference
+memory, provided their `last_applied` check prevents stale state from overriding
+the imperative mode-to-theme mapping.
+
 ## Commands
 
 ```bash
@@ -80,6 +128,7 @@ terminal/
 │   └── appearance-watcher.swift # macOS watcher (Swift)
 ├── launchd/
 │   └── ai.instrukt.appearance-watcher.plist
+├── agent_state.json            # Preference memory and last-applied provenance
 ├── tmux.conf                   # Shared tmux configuration
 ├── install.sh                  # Idempotent installer
 └── README.md

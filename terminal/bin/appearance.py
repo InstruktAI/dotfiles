@@ -5,13 +5,35 @@ Subcommands: get-mode, get-terminal-bg, reload, watch
 
 from __future__ import annotations
 
+import sys
+
+# The launchd appearance-watcher invokes this script with whatever `python3`
+# its PATH resolves first — on macOS that is the system Python 3.9, which lacks
+# `tomllib` (needed for Codex's config.toml). Re-exec under a 3.11+ interpreter
+# so the whole appearance sync keeps working regardless of the caller's PATH.
+if sys.version_info < (3, 11):
+    import os as _os
+    import shutil as _shutil
+
+    _candidates = [
+        "/opt/homebrew/bin/python3",
+        "/usr/local/bin/python3",
+        _shutil.which("python3.13"),
+        _shutil.which("python3.12"),
+        _shutil.which("python3.11"),
+    ]
+    for _python in _candidates:
+        if _python and _os.path.exists(_python) and _os.path.realpath(_python) != _os.path.realpath(sys.executable):
+            _os.execv(_python, [_python, *sys.argv])
+
 import datetime
 import json
 import os
 import plistlib
+import re
 import subprocess
-import sys
 import time
+import tomllib
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -250,6 +272,8 @@ class AgentThemeConfig:
     files: list[Path]
     theme_path: list[str]
     defaults: dict[str, str] = field(default_factory=dict)
+    fmt: str = "json"  # "json" or "toml" — selects the read/write codec
+    mode_only: bool = False
 
 
 AGENTS: list[AgentThemeConfig] = [
@@ -259,11 +283,23 @@ AGENTS: list[AgentThemeConfig] = [
         theme_path=["theme"],
         defaults={"dark": "dark", "light": "light"},
     ),
+    # Antigravity CLI ("agy") replaced the legacy Gemini CLI: settings moved to
+    # antigravity-cli/settings.json and the theme key is top-level "colorScheme"
+    # with plain "dark"/"light" values (was ui.theme = Default/Default Light).
     AgentThemeConfig(
         key="gemini",
-        files=[Path.home() / ".gemini" / "settings.json"],
-        theme_path=["ui", "theme"],
-        defaults={"dark": "Default", "light": "Default Light"},
+        files=[Path.home() / ".gemini" / "antigravity-cli" / "settings.json"],
+        theme_path=["colorScheme"],
+        defaults={"dark": "dark", "light": "light"},
+        mode_only=True,
+    ),
+    # Codex stores its TUI theme as kebab-case `theme` under [tui] in config.toml.
+    AgentThemeConfig(
+        key="codex",
+        files=[Path.home() / ".codex" / "config.toml"],
+        theme_path=["tui", "theme"],
+        defaults={"dark": "one-half-dark", "light": "one-half-light"},
+        fmt="toml",
     ),
 ]
 
@@ -287,32 +323,34 @@ def _resolve_theme_for_mode(
     state: dict[str, object],
     mode: str,
     current_theme: str | None,
-    app_key: str,
-    app_defaults: dict[str, str],
+    agent: AgentThemeConfig,
 ) -> str | None:
     """Determine the correct theme for the given mode and update state."""
-    app_memory = state.setdefault(app_key, {})
+    app_memory = state.setdefault(agent.key, {})
+    if not isinstance(app_memory, dict):
+        raise ValueError(f"invalid agent theme state for {agent.key}")
 
     last_mode = _normalize_mode(app_memory.get("last_mode"))
-    remembered_dark = _normalize_theme(app_memory.get("dark"))
-    remembered_light = _normalize_theme(app_memory.get("light"))
+    last_applied = _normalize_theme(app_memory.get("last_applied"))
+    if not last_mode or not last_applied:
+        raise ValueError(f"incomplete agent theme state for {agent.key}")
 
-    target_theme: str | None = None
-
-    if last_mode == mode:
-        if current_theme:
-            app_memory[mode] = current_theme
+    if agent.mode_only:
+        target_theme = agent.defaults.get(mode, mode)
     else:
-        if last_mode and current_theme:
+        if current_theme and current_theme != last_applied:
             app_memory[last_mode] = current_theme
 
-        target_theme = remembered_dark if mode == "dark" else remembered_light
+        target_theme = _normalize_theme(app_memory.get(mode))
         if not target_theme:
-            target_theme = app_defaults.get(mode)
-        if target_theme:
-            app_memory[mode] = target_theme
+            target_theme = agent.defaults.get(mode)
 
+    if not target_theme:
+        return None
+
+    app_memory[mode] = target_theme
     app_memory["last_mode"] = mode
+    app_memory["last_applied"] = target_theme
     return target_theme
 
 
@@ -336,33 +374,79 @@ def _set_nested(data: dict, path: list[str], value: str) -> None:
     obj[path[-1]] = value
 
 
+def _read_agent_theme(agent: AgentThemeConfig, filepath: Path) -> str | None:
+    """Read the current theme from a config file (json or toml)."""
+    try:
+        text = filepath.read_text(encoding="utf-8")
+        data = tomllib.loads(text) if agent.fmt == "toml" else json.loads(text)
+    except Exception:
+        return None
+    return _get_nested(data, agent.theme_path)
+
+
+def _write_toml_theme(filepath: Path, path: list[str], value: str) -> None:
+    """Surgically set a single `key = "value"` under a bare ``[section]`` header.
+
+    Only the two-segment ``[section].key`` shape used for agent themes (e.g.
+    ``["tui", "theme"]``) is supported; the rest of the TOML is left byte-for-byte
+    intact, so unrelated tables (mcp_servers, hooks.state, projects) are untouched.
+    """
+    section, key = path[0], path[1]
+    lines = filepath.read_text(encoding="utf-8").splitlines()
+    header = f"[{section}]"
+    new_line = f'{key} = "{value}"'
+    key_re = re.compile(rf"^\s*{re.escape(key)}\s*=")
+
+    section_idx = next((i for i, ln in enumerate(lines) if ln.strip() == header), None)
+    if section_idx is None:
+        if lines and lines[-1].strip():
+            lines.append("")
+        lines.extend([header, new_line])
+    else:
+        section_end = len(lines)
+        for j in range(section_idx + 1, len(lines)):
+            if re.match(r"^\s*\[", lines[j]):
+                section_end = j
+                break
+        for j in range(section_idx + 1, section_end):
+            if key_re.match(lines[j]):
+                lines[j] = new_line
+                break
+        else:
+            lines.insert(section_idx + 1, new_line)
+    filepath.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _write_agent_theme(agent: AgentThemeConfig, filepath: Path, target: str) -> None:
+    """Write the resolved theme back to a config file (json or toml)."""
+    if agent.fmt == "toml":
+        _write_toml_theme(filepath, agent.theme_path, target)
+        return
+    data = json.loads(filepath.read_text(encoding="utf-8"))
+    _set_nested(data, agent.theme_path, target)
+    data.pop("_teleclaude_theme_memory", None)
+    filepath.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
 def sync_agent_themes(mode: str, state: dict[str, object]) -> None:
     for agent in AGENTS:
         current_theme: str | None = None
         for filepath in agent.files:
             if not filepath.exists():
                 continue
-            try:
-                data = json.loads(filepath.read_text(encoding="utf-8"))
-                current_theme = _get_nested(data, agent.theme_path)
-                if current_theme:
-                    break
-            except Exception:
-                pass
+            current_theme = _read_agent_theme(agent, filepath)
+            if current_theme:
+                break
 
-        target = _resolve_theme_for_mode(
-            state, mode, current_theme, agent.key, agent.defaults
-        )
+        target = _resolve_theme_for_mode(state, mode, current_theme, agent)
+        if not target:
+            continue
 
         for filepath in agent.files:
             if not filepath.exists():
                 continue
             try:
-                data = json.loads(filepath.read_text(encoding="utf-8"))
-                if target:
-                    _set_nested(data, agent.theme_path, target)
-                data.pop("_teleclaude_theme_memory", None)
-                filepath.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+                _write_agent_theme(agent, filepath, target)
                 log(f"reload {agent.key} theme synced file={filepath} mode={mode}")
             except Exception as exc:
                 log(f"reload {agent.key} theme failed file={filepath} error={exc}")
