@@ -1,4 +1,10 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "instruktai-python-logger",
+# ]
+# ///
 """Unified appearance management - OS agnostic.
 Subcommands: get-mode, get-terminal-bg, reload, watch
 """
@@ -6,25 +12,6 @@ Subcommands: get-mode, get-terminal-bg, reload, watch
 from __future__ import annotations
 
 import sys
-
-# The launchd appearance-watcher invokes this script with whatever `python3`
-# its PATH resolves first — on macOS that is the system Python 3.9, which lacks
-# `tomllib` (needed for Codex's config.toml). Re-exec under a 3.11+ interpreter
-# so the whole appearance sync keeps working regardless of the caller's PATH.
-if sys.version_info < (3, 11):
-    import os as _os
-    import shutil as _shutil
-
-    _candidates = [
-        "/opt/homebrew/bin/python3",
-        "/usr/local/bin/python3",
-        _shutil.which("python3.13"),
-        _shutil.which("python3.12"),
-        _shutil.which("python3.11"),
-    ]
-    for _python in _candidates:
-        if _python and _os.path.exists(_python) and _os.path.realpath(_python) != _os.path.realpath(sys.executable):
-            _os.execv(_python, [_python, *sys.argv])
 
 import datetime
 import json
@@ -39,28 +26,28 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from instrukt_ai_logging import configure_logging, get_logger
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 APPEARANCE_LATITUDE = os.environ.get("APPEARANCE_LATITUDE", "52.37")
 APPEARANCE_LONGITUDE = os.environ.get("APPEARANCE_LONGITUDE", "4.89")
+APPEARANCE_DARK_OFFSET_MINUTES = os.environ.get("APPEARANCE_DARK_OFFSET_MINUTES", "0")
+APPEARANCE_DST_DARK_OFFSET_MINUTES = os.environ.get("APPEARANCE_DST_DARK_OFFSET_MINUTES", "0")
+APPEARANCE_CACHE_DIR = os.environ.get("APPEARANCE_CACHE_DIR", "/tmp")
 APPEARANCE_LOG = os.environ.get("APPEARANCE_LOG", "1")
-APPEARANCE_LOG_FILE = os.environ.get(
-    "APPEARANCE_LOG_FILE", str(SCRIPT_DIR / "appearance.log")
-)
 
 DEFAULT_PATH_PREFIX = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 os.environ["PATH"] = f"{DEFAULT_PATH_PREFIX}:{os.environ.get('PATH', '')}"
+
+configure_logging("appearance")
+LOGGER = get_logger("appearance")
 
 
 def log(message: str) -> None:
     if APPEARANCE_LOG != "1":
         return
-    ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    try:
-        with open(APPEARANCE_LOG_FILE, "a", encoding="utf-8") as handle:
-            handle.write(f"{ts} {message}\n")
-    except OSError:
-        pass
+    LOGGER.info("event", detail=message)
 
 
 def is_macos() -> bool:
@@ -73,28 +60,72 @@ def run_command(
     return subprocess.run(args, check=check, capture_output=True, text=True)
 
 
-def is_daylight() -> bool:
-    cache_file = Path("/tmp/sunrise-sunset-cache.json")
+def parse_minutes(value: str) -> int:
+    try:
+        minutes = int(value)
+    except ValueError:
+        return 0
+    return max(0, minutes)
+
+
+def is_local_dst_active() -> bool:
+    return time.localtime().tm_isdst > 0
+
+
+def dark_offset() -> datetime.timedelta:
+    minutes = parse_minutes(APPEARANCE_DARK_OFFSET_MINUTES)
+    if is_local_dst_active():
+        minutes += parse_minutes(APPEARANCE_DST_DARK_OFFSET_MINUTES)
+    return datetime.timedelta(minutes=minutes)
+
+
+def parse_coordinate(value: str, *, minimum: float, maximum: float, name: str) -> float | None:
+    try:
+        coordinate = float(value)
+    except ValueError:
+        log(f"is_daylight invalid {name} value={value}")
+        return None
+    if minimum <= coordinate <= maximum:
+        return coordinate
+    log(f"is_daylight invalid {name} value={value}")
+    return None
+
+
+def solar_cache_file(latitude: float, longitude: float) -> Path:
+    date_key = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+    lat_key = f"{latitude:.4f}".replace("-", "m").replace(".", "_")
+    lng_key = f"{longitude:.4f}".replace("-", "m").replace(".", "_")
+    return Path(APPEARANCE_CACHE_DIR) / f"sunrise-sunset-{date_key}-{lat_key}-{lng_key}.json"
+
+
+def is_daylight(*, allow_fallback: bool = True) -> bool | None:
+    latitude = parse_coordinate(APPEARANCE_LATITUDE, minimum=-90.0, maximum=90.0, name="latitude")
+    longitude = parse_coordinate(APPEARANCE_LONGITUDE, minimum=-180.0, maximum=180.0, name="longitude")
+    if latitude is None or longitude is None:
+        if not allow_fallback:
+            return None
+        hour = datetime.datetime.now().hour
+        daylight = 6 <= hour < 18
+        log(f"is_daylight using hour fallback daylight={daylight}")
+        return daylight
+
+    cache_file = solar_cache_file(latitude, longitude)
     cache_max_age = 86400
 
-    def parse_time(value: str) -> Optional[datetime.time]:
+    def parse_solar_time(value: str) -> Optional[datetime.datetime]:
         try:
-            dt = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
-            return dt.time()
+            return datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
-            try:
-                time_part = value.split("T", 1)[1].split("+", 1)[0]
-                return datetime.time.fromisoformat(time_part)
-            except Exception:
-                return None
+            return None
 
     def is_now_between(sunrise: str, sunset: str) -> bool:
-        sunrise_time = parse_time(sunrise)
-        sunset_time = parse_time(sunset)
+        sunrise_time = parse_solar_time(sunrise)
+        sunset_time = parse_solar_time(sunset)
         if sunrise_time is None or sunset_time is None:
             return False
-        now_time = datetime.datetime.utcnow().time()
-        return sunrise_time < now_time < sunset_time
+        dark_start = sunset_time - dark_offset()
+        now = datetime.datetime.now(datetime.timezone.utc)
+        return sunrise_time < now < dark_start
 
     if cache_file.exists():
         age = int(time.time() - cache_file.stat().st_mtime)
@@ -105,30 +136,57 @@ def is_daylight() -> bool:
                 sunrise = results.get("sunrise")
                 sunset = results.get("sunset")
                 if sunrise and sunset:
-                    return is_now_between(sunrise, sunset)
-            except Exception:
-                pass
+                    daylight = is_now_between(sunrise, sunset)
+                    log("is_daylight using cached sunrise-sunset data")
+                    return daylight
+            except Exception as exc:
+                log(f"is_daylight cache read failed error={exc}")
 
     url = (
         "https://api.sunrise-sunset.org/json"
-        f"?lat={APPEARANCE_LATITUDE}&lng={APPEARANCE_LONGITUDE}&formatted=0"
+        f"?lat={latitude}&lng={longitude}&formatted=0"
     )
     try:
-        with urllib.request.urlopen(url, timeout=5) as response:
+        request = urllib.request.Request(
+            url,
+            headers={"User-Agent": "dotfiles-appearance/1.0"},
+        )
+        with urllib.request.urlopen(request, timeout=5) as response:
             payload = response.read().decode("utf-8")
         data = json.loads(payload)
         if data.get("status") == "OK":
+            cache_file.parent.mkdir(parents=True, exist_ok=True)
             cache_file.write_text(json.dumps(data), encoding="utf-8")
             results = data.get("results", {})
             sunrise = results.get("sunrise")
             sunset = results.get("sunset")
             if sunrise and sunset:
-                return is_now_between(sunrise, sunset)
-    except Exception:
-        pass
+                daylight = is_now_between(sunrise, sunset)
+                log("is_daylight using live sunrise-sunset data")
+                return daylight
+        log(f"is_daylight sunrise-sunset API returned status={data.get('status')}")
+    except Exception as exc:
+        log(f"is_daylight sunrise-sunset API failed error={exc}")
 
+    if not allow_fallback:
+        return None
     hour = datetime.datetime.now().hour
-    return 6 <= hour < 18
+    daylight = 6 <= hour < 18
+    log(f"is_daylight using hour fallback daylight={daylight}")
+    return daylight
+
+
+def get_solar_mode(*, allow_fallback: bool = True) -> str | None:
+    offset = dark_offset()
+    daylight = is_daylight(allow_fallback=allow_fallback)
+    if daylight is None:
+        log(f"get_solar_mode unavailable dark_offset_minutes={int(offset.total_seconds() / 60)}")
+        return None
+    if daylight:
+        log(f"get_solar_mode detected light from sunrise-sunset dark_offset_minutes={int(offset.total_seconds() / 60)}")
+        return "light"
+    log(f"get_solar_mode detected dark from sunrise-sunset dark_offset_minutes={int(offset.total_seconds() / 60)}")
+    return "dark"
 
 
 def get_mode() -> str:
@@ -138,22 +196,48 @@ def get_mode() -> str:
         return env_mode
 
     if is_macos():
-        try:
-            result = run_command(["defaults", "read", "-g", "AppleInterfaceStyle"])
-            if result.returncode == 0 and "Dark" in result.stdout:
-                log("get_mode detected dark from macOS defaults")
-                return "dark"
-        except Exception:
-            pass
-        log("get_mode detected light from macOS defaults")
-        return "light"
+        mode = get_macos_appearance_mode()
+        log(f"get_mode detected {mode} from macOS defaults")
+        return mode
 
-    if is_daylight():
-        log("get_mode detected light from sunrise-sunset")
-        return "light"
+    mode = get_solar_mode()
+    if mode is None:
+        mode = "light"
+        log("get_mode defaulting to light because solar mode is unavailable")
+    log(f"get_mode detected {mode} from sunrise-sunset")
+    return mode
 
-    log("get_mode detected dark from sunrise-sunset")
-    return "dark"
+
+def get_macos_appearance_mode() -> str:
+    try:
+        result = run_command(["defaults", "read", "-g", "AppleInterfaceStyle"])
+        if result.returncode == 0 and "Dark" in result.stdout:
+            return "dark"
+    except Exception:
+        pass
+    return "light"
+
+
+def set_macos_appearance(mode: str) -> bool:
+    if mode not in {"dark", "light"}:
+        return False
+    current = get_macos_appearance_mode()
+    if current == mode:
+        log(f"apply_system macOS appearance already mode={mode}")
+        return True
+    enabled = "true" if mode == "dark" else "false"
+    result = run_command(
+        [
+            "osascript",
+            "-e",
+            f'tell application "System Events" to tell appearance preferences to set dark mode to {enabled}',
+        ]
+    )
+    if result.returncode != 0:
+        log(f"apply_system failed mode={mode} error={result.stderr.strip()}")
+        return False
+    log(f"apply_system set macOS appearance mode={mode}")
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -338,7 +422,22 @@ def _resolve_theme_for_mode(
     if agent.mode_only:
         target_theme = agent.defaults.get(mode, mode)
     else:
-        if current_theme and current_theme != last_applied:
+        known_mode_themes = {
+            theme
+            for theme in (
+                _normalize_theme(app_memory.get("dark")),
+                _normalize_theme(app_memory.get("light")),
+                agent.defaults.get("dark"),
+                agent.defaults.get("light"),
+            )
+            if theme
+        }
+        if (
+            last_mode == mode
+            and current_theme
+            and current_theme != last_applied
+            and current_theme not in known_mode_themes
+        ):
             app_memory[last_mode] = current_theme
 
         target_theme = _normalize_theme(app_memory.get(mode))
@@ -479,8 +578,7 @@ def cmd_get_terminal_bg() -> int:
     return 0
 
 
-def cmd_reload() -> int:
-    mode = get_mode()
+def reload_mode(mode: str) -> int:
     log(f"reload start pid={os.getpid()} mode={mode}")
 
     state = _load_agent_state()
@@ -512,6 +610,23 @@ def cmd_reload() -> int:
     return 0
 
 
+def cmd_reload() -> int:
+    return reload_mode(get_mode())
+
+
+def cmd_apply_system() -> int:
+    if not is_macos():
+        print("apply-system is only supported on macOS.", file=sys.stderr)
+        return 1
+    mode = get_solar_mode(allow_fallback=False)
+    if mode is None:
+        print("Solar appearance unavailable; leaving macOS Appearance unchanged.", file=sys.stderr)
+        return 1
+    if not set_macos_appearance(mode):
+        return 1
+    return 0
+
+
 def cmd_watch() -> int:
     if is_macos():
         print("On macOS, use the Swift-based appearance-watcher instead.")
@@ -534,6 +649,7 @@ Commands:
   get-mode          Output current mode (dark/light)
   get-terminal-bg   Output terminal background hex color
   reload            Sync agent CLI themes and signal TUI refresh
+  apply-system      Set macOS Appearance from sunrise/sunset offset
   watch             Poll for appearance changes (Linux fallback)
 
 Environment variables:
@@ -541,8 +657,12 @@ Environment variables:
   TERMINAL_BG           Override terminal background (#rrggbb)
   APPEARANCE_LATITUDE   Latitude for sunrise-sunset (default: 52.37)
   APPEARANCE_LONGITUDE  Longitude for sunrise-sunset (default: 4.89)
+  APPEARANCE_DARK_OFFSET_MINUTES
+                        Always start dark mode this many minutes before sunset (default: 0)
+  APPEARANCE_DST_DARK_OFFSET_MINUTES
+                        Extra dark offset while local DST is active (default: 0)
+  APPEARANCE_CACHE_DIR  Cache directory for sunrise-sunset data (default: /tmp)
   APPEARANCE_LOG        Enable logging (default: 1)
-  APPEARANCE_LOG_FILE   Log file path
 """
     print(help_text)
     return 0
@@ -556,6 +676,8 @@ def main() -> int:
         return cmd_get_terminal_bg()
     if command == "reload":
         return cmd_reload()
+    if command == "apply-system":
+        return cmd_apply_system()
     if command == "watch":
         return cmd_watch()
     if command in {"help", "--help", "-h"}:

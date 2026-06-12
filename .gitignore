@@ -5,6 +5,7 @@
 # Machine-specific configs (synced via Syncthing, not git)
 *.local.zsh
 *.local.sh
+.env
 
 # History/backup folders
 .history/
@@ -12,5 +13,9 @@
 # Python bytecode
 __pycache__/
 
-# Appearance logs
-terminal/bin/appearance.log
+# Appearance runtime logs and sync-conflict copies
+terminal/bin/*.log
+terminal/bin/*.log.*
+terminal/bin/*.sync-conflict-*
+
+.teleclaude/

@@ -35,7 +35,7 @@ The primary way to use this repository is to run the main installer script.
 **What it does:**
 
 1.  Symlinks the `zsh/` directory to `~/.config/zsh`.
-2.  Symlinks `terminal/bin/appearance` to `~/.local/bin/appearance` (requires `~/.local/bin` to be in the `PATH`).
+2.  Symlinks `terminal/bin/appearance.py` to `~/.local/bin/appearance` (requires `~/.local/bin` to be in the `PATH`).
 3.  Symlinks `terminal/tmux.conf` to `~/.tmux.conf`.
 4.  On macOS, it compiles and installs a Swift-based `appearance-watcher` and sets up a `launchd` agent to run it automatically.
 

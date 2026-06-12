@@ -68,6 +68,15 @@ if [[ "$SKIP_APPS" == false && "$(uname -s)" == "Darwin" && -f "$DOTFILES/macos/
     echo ""
     echo "=== Homebrew Packages ==="
     brew bundle --file="$DOTFILES/macos/Brewfile" --no-lock
+
+    # Keep `node` on the v24 line. Some formulae (e.g. gemini-cli) depend on the
+    # unversioned `node`, which `brew upgrade` would bump and relink past v24.
+    # Pinning skips it during upgrades; node@24 owns the bin/node symlink.
+    if brew list --formula node &>/dev/null; then
+        brew pin node 2>/dev/null || true
+        brew unlink node &>/dev/null || true
+    fi
+    brew link --overwrite --force node@24
 fi
 
 # ─── macOS defaults ────────────────────────────────────────────────────────

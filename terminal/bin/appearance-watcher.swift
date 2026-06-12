@@ -66,11 +66,9 @@ class AppearanceWatcher: NSObject, NSApplicationDelegate {
         task.executableURL = appearanceURL
         task.arguments = ["reload"]
         var env = ProcessInfo.processInfo.environment
+        let pathPrefix = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+        env["PATH"] = "\(pathPrefix):\(env["PATH"] ?? "")"
         env["APPEARANCE_LOG"] = "1"
-        let logURL = appearanceURL.resolvingSymlinksInPath()
-            .deletingLastPathComponent()
-            .appendingPathComponent("appearance.log")
-        env["APPEARANCE_LOG_FILE"] = logURL.path
         env["APPEARANCE_MODE"] = mode
         task.environment = env
 

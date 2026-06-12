@@ -9,6 +9,8 @@ Cross-platform terminal/tmux appearance management with automatic dark/light mod
 - **Environment passthrough**: Host passes settings to remote sessions via SSH
 - **tmux theming**: Dynamic borders, status bar, and pane styling
 - **CLI theme sync**: Updates Claude, Antigravity CLI, and Codex themes
+- **System appearance automation**: macOS Appearance can follow sunrise/sunset
+  with a configurable early-dark offset
 
 ## Installation
 
@@ -19,7 +21,14 @@ Cross-platform terminal/tmux appearance management with automatic dark/light mod
 This will:
 1. Symlink `bin/appearance` to `~/.local/bin/`
 2. Symlink `tmux.conf` to `~/.tmux.conf`
-3. On macOS: compile Swift watcher and install launchd job
+3. On macOS: compile the Swift watcher and install launchd jobs for watching
+   macOS Appearance changes and applying the solar appearance schedule
+
+`appearance` is a uv script. Its Python dependencies are declared inline in
+`bin/appearance.py` and resolved by `uv run --script`; the installer does not
+install Python packages. Runtime logging uses the InstruktAI log root, which
+must be writable by the user running `appearance`; the logger creates the
+per-app directory on first use.
 
 ## How It Works
 
@@ -28,6 +37,34 @@ This will:
 1. `APPEARANCE_MODE` environment variable (from SSH host)
 2. macOS: `defaults read -g AppleInterfaceStyle`
 3. Linux: Sunrise/sunset API based on location
+
+### macOS System Appearance Schedule
+
+`appearance apply-system` sets macOS Appearance itself from sunrise/sunset. The
+installed `ai.instrukt.appearance-system` LaunchAgent runs it every five
+minutes. By default, it adds a 60 minute early-dark correction only while the
+local timezone is in daylight saving time:
+
+```xml
+<key>APPEARANCE_DST_DARK_OFFSET_MINUTES</key>
+<string>60</string>
+```
+
+Change that value in
+`.env` and re-run `./install.sh` to adjust the DST correction. `launchd` does
+not read shell startup files or `.env` directly; `install.sh` renders the
+LaunchAgent plist from the current shell environment first, then `.env`, then
+the defaults in the installer. Use `APPEARANCE_DARK_OFFSET_MINUTES` only for a
+year-round offset. The existing watcher then observes the macOS Appearance
+change and syncs tmux plus agent CLI themes.
+
+Effective dark start:
+
+```text
+dark_start = sunset
+           - APPEARANCE_DARK_OFFSET_MINUTES
+           - APPEARANCE_DST_DARK_OFFSET_MINUTES when local DST is active
+```
 
 ### Terminal Background Priority
 
@@ -101,6 +138,7 @@ the imperative mode-to-theme mapping.
 appearance get-mode         # Output: dark or light
 appearance get-terminal-bg  # Output: #rrggbb
 appearance reload           # Reload all themes
+appearance apply-system     # Set macOS Appearance from solar schedule
 appearance tmux-theme       # Generate /tmp/tmux-theme.conf
 appearance focus-pane PID   # Handle tmux pane focus
 appearance watch            # Poll for changes (Linux)
@@ -114,10 +152,21 @@ appearance watch            # Poll for changes (Linux)
 | `TERMINAL_BG` | (detected) | Override terminal background: `#rrggbb` |
 | `APPEARANCE_LATITUDE` | 52.37 | Latitude for sunrise/sunset |
 | `APPEARANCE_LONGITUDE` | 4.89 | Longitude for sunrise/sunset |
+| `APPEARANCE_DARK_OFFSET_MINUTES` | 0 | Always start dark mode this many minutes before sunset |
+| `APPEARANCE_DST_DARK_OFFSET_MINUTES` | 0 | Extra dark offset while local DST is active |
+| `APPEARANCE_CACHE_DIR` | `/tmp` | Directory for date/location-keyed sunrise/sunset cache files |
 | `APPEARANCE_BORDER_PERCENT` | 15 | Border blend percentage |
 | `APPEARANCE_STATUS_BG_PERCENT` | 10 | Status bar background blend |
 | `APPEARANCE_STATUS_FG_PERCENT` | 40 | Status bar foreground blend |
 | `APPEARANCE_FOCUS_DIM_PERCENT` | 10 | Inactive pane dim percentage |
+| `APPEARANCE_LOG` | 1 | Enable `appearance` runtime logging |
+| `INSTRUKT_AI_LOG_ROOT` | `/var/log/instrukt-ai` | Override root for InstruktAI logs |
+
+Runtime logs are written through `instrukt_ai_logging` and read with
+`instrukt-ai-logs appearance`. The default log file is
+`/var/log/instrukt-ai/appearance/appearance.log`; when
+`INSTRUKT_AI_LOG_ROOT` is set, the file is
+`$INSTRUKT_AI_LOG_ROOT/appearance/appearance.log`.
 
 ## Files
 
@@ -127,10 +176,10 @@ terminal/
 │   ├── appearance              # Main script (python)
 │   └── appearance-watcher.swift # macOS watcher (Swift)
 ├── launchd/
+│   ├── ai.instrukt.appearance-system.plist
 │   └── ai.instrukt.appearance-watcher.plist
 ├── agent_state.json            # Preference memory and last-applied provenance
 ├── tmux.conf                   # Shared tmux configuration
-├── install.sh                  # Idempotent installer
 └── README.md
 ```
 
