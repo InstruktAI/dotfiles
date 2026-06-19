@@ -106,9 +106,18 @@ run_brew_bundle() {
     fi
 
     echo "  Installing missing Brewfile.local entries (no upgrades)..."
-    HOMEBREW_BUNDLE_NO_UPGRADE=1 \
-    HOMEBREW_NO_INSTALL_UPGRADE=1 \
-        brew bundle install --file="$brewfile" --no-lock --no-upgrade
+    # --adopt lets brew take over apps already installed by hand (iTerm2,
+    # VS Code, ...) when they match the cask, instead of erroring on the
+    # existing artifact. A leftover mismatch (app at a different version, a
+    # flaky cask) must not abort the whole bootstrap, so the run is non-fatal
+    # and reported.
+    if ! HOMEBREW_BUNDLE_NO_UPGRADE=1 \
+        HOMEBREW_NO_INSTALL_UPGRADE=1 \
+        HOMEBREW_CASK_OPTS="--adopt" \
+        brew bundle install --file="$brewfile" --no-lock --no-upgrade; then
+        echo "  [WARN] Some entries did not install (e.g. an app already present"
+        echo "         at a different version). Continuing."
+    fi
     pin_node_formula
 }
 
