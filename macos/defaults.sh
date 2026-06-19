@@ -1,5 +1,5 @@
 #!/bin/bash
-# macOS system defaults - curated for modern macOS (Sonoma/Sequoia).
+# macOS system defaults - curated for modern macOS (Sequoia/Tahoe).
 # This file is the upstream template. The installer copies it to
 # defaults.local.sh once and only executes that local copy.
 # Run once on a new machine, or re-run to reset preferences.
@@ -9,8 +9,80 @@ set -euo pipefail
 
 echo "Applying macOS defaults..."
 
-# Close System Preferences to prevent overrides
-osascript -e 'tell application "System Preferences" to quit' 2>/dev/null || true
+# Close System Settings to prevent overrides (renamed from System Preferences
+# in macOS Ventura; the old name is kept as a fallback for older systems).
+osascript -e 'tell application "System Settings" to quit' 2>/dev/null ||
+    osascript -e 'tell application "System Preferences" to quit' 2>/dev/null ||
+    true
+
+# Some app preference domains (Safari, Mail, ...) live inside sandboxed app
+# containers that modern macOS protects with TCC. Writing them only succeeds
+# when the terminal running this script has Full Disk Access. macOS exposes no
+# API to self-grant it, so the best we can do is open the exact settings pane,
+# name the app to enable, and block until the domain is actually writable.
+
+# Full Disk Access pane in System Settings (Privacy & Security).
+FDA_PANE="x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"
+
+# Best-effort name of the app the user must grant Full Disk Access to.
+fda_app_name() {
+    case "${TERM_PROGRAM:-}" in
+        Apple_Terminal) echo "Terminal" ;;
+        iTerm.app) echo "iTerm" ;;
+        vscode) echo "Visual Studio Code (and Code Helper)" ;;
+        WezTerm) echo "WezTerm" ;;
+        ghostty) echo "Ghostty" ;;
+        tmux) echo "your terminal app (you are running under tmux)" ;;
+        "") echo "your terminal app" ;;
+        *) echo "$TERM_PROGRAM" ;;
+    esac
+}
+
+domain_writable() {
+    local domain="$1"
+    if defaults write "$domain" InstruktDotfilesProbe -bool true 2>/dev/null; then
+        defaults delete "$domain" InstruktDotfilesProbe 2>/dev/null || true
+        return 0
+    fi
+    return 1
+}
+
+# Block until a sandboxed preference domain is writable. Not optional: the run
+# does not continue until Full Disk Access is granted.
+require_domain_writable() {
+    local domain="$1"
+    local app
+    app="$(fda_app_name)"
+
+    domain_writable "$domain" && return 0
+
+    echo ""
+    echo "  [ACTION REQUIRED] Writing '$domain' needs Full Disk Access for $app."
+    echo "  Opening System Settings -> Privacy & Security -> Full Disk Access..."
+    open "$FDA_PANE" 2>/dev/null || true
+    osascript >/dev/null 2>&1 <<OSA || true
+display dialog "Full Disk Access is required to apply '$domain' settings.
+
+In the window that just opened:
+  1. Enable (or add with the + button) \"$app\".
+  2. Full Disk Access changes usually need the terminal to be quit & reopened.
+
+Click OK after enabling it." buttons {"OK"} default button "OK" with title "Dotfiles setup"
+OSA
+
+    local attempts=0
+    until domain_writable "$domain"; do
+        attempts=$((attempts + 1))
+        if ((attempts > 10)); then
+            echo "  [STOP] '$domain' still not writable." >&2
+            echo "         Full Disk Access changes require quitting and reopening" >&2
+            echo "         $app. Do that, then re-run this script." >&2
+            exit 1
+        fi
+        read -r -p "  Press Enter after enabling Full Disk Access (Ctrl-C to abort)... " _ || exit 1
+    done
+    echo "  [OK] '$domain' is now writable"
+}
 
 # =============================================================================
 # General UI/UX
@@ -155,12 +227,13 @@ defaults write com.apple.dock wvous-bl-modifier -int 0
 # Safari (Developer)
 # =============================================================================
 
-# Enable Develop menu and Web Inspector
+# Enable Develop menu and Web Inspector (sandboxed domain; needs Full Disk Access)
+require_domain_writable com.apple.Safari
 defaults write com.apple.Safari IncludeDevelopMenu -bool true
 defaults write com.apple.Safari WebKitDeveloperExtrasEnabledPreferenceKey -bool true
 defaults write com.apple.Safari com.apple.Safari.ContentPageGroupIdentifier.WebKit2DeveloperExtrasEnabled -bool true
 
-# Enable context menu item for Web Inspector
+# Enable context menu item for Web Inspector (global domain, not sandboxed)
 defaults write NSGlobalDomain WebKitDeveloperExtras -bool true
 
 # =============================================================================
@@ -168,6 +241,8 @@ defaults write NSGlobalDomain WebKitDeveloperExtras -bool true
 # =============================================================================
 
 # Copy addresses as "foo@bar.com" instead of "Foo Bar <foo@bar.com>"
+# (sandboxed domain; needs Full Disk Access)
+require_domain_writable com.apple.mail
 defaults write com.apple.mail AddressesIncludeNameOnPasteboard -bool false
 
 # =============================================================================
