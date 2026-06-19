@@ -128,12 +128,30 @@ diff_brew_bundle() {
         return
     fi
 
+    # What a --no-upgrade install would actually add: Brewfile entries that are
+    # not installed at all. Outdated or unlinked packages are left untouched by
+    # the install, so they are excluded here (unlike `brew bundle check`).
+    local missing_casks missing_formulae
+    missing_casks="$(comm -23 \
+        <(brew bundle list --casks --file="$brewfile" 2>/dev/null | sort -u) \
+        <(brew list --cask -1 2>/dev/null | sort -u))"
+    missing_formulae="$(comm -23 \
+        <(brew bundle list --formulae --file="$brewfile" 2>/dev/null | sort -u) \
+        <(brew list --formula -1 2>/dev/null | sort -u))"
+
     echo "=== Homebrew: what ./install.sh will install ==="
     echo ""
-    if brew bundle check --file="$brewfile" &>/dev/null; then
-        echo "Nothing - everything in Brewfile.local is already installed."
+    if [[ -z "$missing_casks$missing_formulae" ]]; then
+        echo "Nothing - every Brewfile.local entry is already installed."
     else
-        brew bundle check --file="$brewfile" --verbose 2>&1 | sed 's/^/  /' || true
+        if [[ -n "$missing_casks" ]]; then
+            echo "Casks:"
+            printf '%s\n' "$missing_casks" | sed 's/^/  /'
+        fi
+        if [[ -n "$missing_formulae" ]]; then
+            echo "Formulae:"
+            printf '%s\n' "$missing_formulae" | sed 's/^/  /'
+        fi
     fi
 
     echo ""
