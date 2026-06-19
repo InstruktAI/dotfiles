@@ -123,8 +123,8 @@ The synced settings locations are declared in the `AGENTS` table in
 | Antigravity CLI | `~/.gemini/antigravity-cli/settings.json` | `colorScheme` |
 | Codex | `~/.codex/config.toml` | `[tui].theme` |
 
-Preference memory and last-applied provenance live in
-`terminal/agent_state.json`.
+Preference memory and last-applied provenance live in the local, git-ignored
+`terminal/agent_state.json`, which is created on first reload when absent.
 
 This contract applies to every synced agent. For each agent, mode-only fields
 that accept only `dark` or `light` write the current mode directly and do not
@@ -178,7 +178,7 @@ terminal/
 ├── launchd/
 │   ├── ai.instrukt.appearance-system.plist
 │   └── ai.instrukt.appearance-watcher.plist
-├── agent_state.json            # Preference memory and last-applied provenance
+├── agent_state.json            # Local ignored preference memory/provenance
 ├── tmux.conf                   # Shared tmux configuration
 └── README.md
 ```

@@ -416,8 +416,6 @@ def _resolve_theme_for_mode(
 
     last_mode = _normalize_mode(app_memory.get("last_mode"))
     last_applied = _normalize_theme(app_memory.get("last_applied"))
-    if not last_mode or not last_applied:
-        raise ValueError(f"incomplete agent theme state for {agent.key}")
 
     if agent.mode_only:
         target_theme = agent.defaults.get(mode, mode)
@@ -433,7 +431,9 @@ def _resolve_theme_for_mode(
             if theme
         }
         if (
-            last_mode == mode
+            last_mode
+            and last_applied
+            and last_mode == mode
             and current_theme
             and current_theme != last_applied
             and current_theme not in known_mode_themes

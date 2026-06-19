@@ -26,6 +26,7 @@ zsh/.zsh_history
 __pycache__/
 
 # Appearance runtime logs and sync-conflict copies
+terminal/agent_state.json
 terminal/bin/*.log
 terminal/bin/*.log.*
 terminal/bin/*.sync-conflict-*
