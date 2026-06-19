@@ -95,6 +95,17 @@ install_zsh_activation() {
     fi
 
     local zshrc="$HOME/.zshrc"
+
+    # Skip the rewrite when the managed block is already present, correct, and
+    # free of legacy lines this installer used to strip.
+    if [[ -f "$zshrc" ]] \
+        && grep -qF '# >>> instrukt dotfiles >>>' "$zshrc" \
+        && grep -qF '[[ -r "$HOME/.config/zsh/init.zsh" ]] && source "$HOME/.config/zsh/init.zsh"' "$zshrc" \
+        && ! grep -qE 'ZDOTDIR="\$HOME/\.config/zsh"|\$ZDOTDIR/00-helpers\.zsh|Sync/dotfiles/zsh/init\.zsh|Workspace/InstruktAI/dotfiles/zsh/init\.zsh' "$zshrc"; then
+        echo "  [OK] ~/.zshrc already sources ~/.config/zsh/init.zsh"
+        return
+    fi
+
     local tmp
     tmp="$(mktemp)"
     touch "$zshrc"
@@ -167,9 +178,15 @@ link "$DOTFILES/terminal/tmux.conf" "$HOME/.tmux.conf"
 
 if [[ "$OS" == "Darwin" ]]; then
     if [[ -d "$DOTFILES/iterm2" ]]; then
-        defaults write com.googlecode.iterm2 PrefsCustomFolder -string "$DOTFILES/iterm2"
-        defaults write com.googlecode.iterm2 LoadPrefsFromCustomFolder -bool true
-        echo "  [OK] iTerm2 prefs -> $DOTFILES/iterm2"
+        iterm_folder="$(defaults read com.googlecode.iterm2 PrefsCustomFolder 2>/dev/null || true)"
+        iterm_load="$(defaults read com.googlecode.iterm2 LoadPrefsFromCustomFolder 2>/dev/null || true)"
+        if [[ "$iterm_folder" == "$DOTFILES/iterm2" && "$iterm_load" == "1" ]]; then
+            echo "  [OK] iTerm2 prefs -> $DOTFILES/iterm2"
+        else
+            defaults write com.googlecode.iterm2 PrefsCustomFolder -string "$DOTFILES/iterm2"
+            defaults write com.googlecode.iterm2 LoadPrefsFromCustomFolder -bool true
+            echo "  [SET] iTerm2 prefs -> $DOTFILES/iterm2"
+        fi
     fi
 
     watcher_bin="$DOTFILES/terminal/bin/appearance-watcher"
@@ -199,12 +216,25 @@ if [[ "$OS" == "Darwin" ]]; then
     for plist_name in ai.instrukt.appearance-watcher.plist ai.instrukt.appearance-system.plist; do
         plist_src="$DOTFILES/terminal/launchd/$plist_name"
         plist_dst="$HOME/Library/LaunchAgents/$plist_name"
-        render_launchd_plist "$plist_src" "$plist_dst"
-        echo "  [COPY] $plist_dst"
+        plist_label="${plist_name%.plist}"
 
+        rendered="$(mktemp)"
+        render_launchd_plist "$plist_src" "$rendered"
+
+        # Only re-install and reload when the rendered plist actually changed or
+        # the agent is not loaded. Otherwise reloading would needlessly restart a
+        # running daemon on every install.
+        if [[ -f "$plist_dst" ]] && cmp -s "$rendered" "$plist_dst" && launchctl list "$plist_label" &>/dev/null; then
+            rm -f "$rendered"
+            echo "  [OK] $plist_label loaded"
+            continue
+        fi
+
+        mv "$rendered" "$plist_dst"
+        echo "  [COPY] $plist_dst"
         launchctl unload "$plist_dst" 2>/dev/null || true
         launchctl load "$plist_dst"
-        echo "  [LAUNCHD] ${plist_name%.plist} loaded"
+        echo "  [LAUNCHD] $plist_label loaded"
     done
 fi
 

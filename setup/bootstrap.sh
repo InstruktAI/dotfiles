@@ -70,14 +70,21 @@ pin_node_formula() {
     fi
 
     # Keep `node` on the v24 line. Some formulae depend on unversioned `node`;
-    # pinning keeps the autoupdate agent from relinking past v24.
+    # pinning keeps the autoupdate agent from relinking past v24. Skip entirely
+    # when node@24 is already the active node, so re-runs do not relink.
+    if ! brew list --formula node@24 &>/dev/null; then
+        return
+    fi
+
+    if [[ "$(node --version 2>/dev/null)" == v24.* ]]; then
+        return
+    fi
+
     if brew list --formula node &>/dev/null; then
         brew pin node 2>/dev/null || true
         brew unlink node &>/dev/null || true
     fi
-    if brew list --formula node@24 &>/dev/null; then
-        brew link --overwrite --force node@24
-    fi
+    brew link --overwrite --force node@24
 }
 
 run_brew_bundle() {
