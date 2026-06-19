@@ -235,11 +235,17 @@ upgrade_apps() {
         echo "No safe (non-breaking) formula upgrades available."
     fi
 
-    if ((${#held[@]} > 0 || ${#casks[@]} > 0)); then
+    if ((${#held[@]} > 0)); then
         echo ""
-        echo "HELD BACK - major version change, review and upgrade manually:"
-        if ((${#held[@]} > 0)); then printf '  formula  %s\n' "${held[@]}"; fi
-        if ((${#casks[@]} > 0)); then printf '  cask     %s\n' "${casks[@]}"; fi
+        echo "HELD BACK - formula crossing a major version (possible breaking change):"
+        printf '  %s\n' "${held[@]}"
+    fi
+    if ((${#casks[@]} > 0)); then
+        echo ""
+        echo "HELD BACK - casks (app version strings are not comparable; upgrade manually):"
+        printf '  %s\n' "${casks[@]}"
+    fi
+    if ((${#held[@]} > 0 || ${#casks[@]} > 0)); then
         echo ""
         echo "Upgrade any of these yourself when ready: brew upgrade <name>"
     fi
