@@ -29,14 +29,10 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --install-apps | --install-brew)
-            # Installing missing entries is the default now; accepted for
-            # backward compatibility.
-            ;;
         --diff-apps)
             DIFF_APPS=true
             ;;
-        --no-apps | --no-brew)
+        --no-apps)
             SKIP_APPS=true
             ;;
         --no-defaults)
