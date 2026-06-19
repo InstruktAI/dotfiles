@@ -33,7 +33,7 @@ while [[ $# -gt 0 ]]; do
             # Installing missing entries is the default now; accepted for
             # backward compatibility.
             ;;
-        --diff-apps | --diff-brew)
+        --diff-apps)
             DIFF_APPS=true
             ;;
         --no-apps | --no-brew)
