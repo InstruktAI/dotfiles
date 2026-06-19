@@ -1,5 +1,6 @@
-# Dotfiles Brewfile - curated core tools
-# Install: brew bundle --file=macos/Brewfile --no-lock
+# Dotfiles Brewfile - curated core tools.
+# This file is the upstream template. The installer copies it to
+# Brewfile.local once and only checks/installs from that local copy.
 
 tap "homebrew/bundle"
 tap "homebrew/services"

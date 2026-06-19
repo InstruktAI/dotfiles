@@ -1,5 +1,7 @@
 #!/bin/bash
-# macOS system defaults - curated for modern macOS (Sonoma/Sequoia)
+# macOS system defaults - curated for modern macOS (Sonoma/Sequoia).
+# This file is the upstream template. The installer copies it to
+# defaults.local.sh once and only executes that local copy.
 # Run once on a new machine, or re-run to reset preferences.
 # Idempotent: safe to run multiple times.
 
@@ -192,12 +194,6 @@ defaults write com.apple.TextEdit PlainTextEncodingForWrite -int 4
 
 # Enable WebKit Developer Tools in Mac App Store
 defaults write com.apple.appstore WebKitDeveloperExtras -bool true
-
-# =============================================================================
-# Locale (machine-specific — override in defaults.local.sh)
-# =============================================================================
-
-[[ -r "${BASH_SOURCE[0]%/*}/defaults.local.sh" ]] && source "${BASH_SOURCE[0]%/*}/defaults.local.sh"
 
 # =============================================================================
 # Restart affected applications

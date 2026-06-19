@@ -1,14 +1,26 @@
 # Syncthing metadata
 .stfolder/
 .stversions/
+*.sync-conflict-*
+
+# macOS metadata
+.DS_Store
 
 # Machine-specific configs (synced via Syncthing, not git)
 *.local.zsh
 *.local.sh
+macos/Brewfile.local
 .env
 
-# History/backup folders
+# History/backup files and folders
 .history/
+.zsh_history
+**/.zsh_history
+zsh/.zsh_history
+
+# Editor/runtime backups
+*.bak
+*.tmp
 
 # Python bytecode
 __pycache__/

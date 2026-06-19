@@ -27,20 +27,16 @@ The core of the configuration is in the numbered `.zsh` files:
 
 ## Usage
 
-These configuration files are intended to be sourced from a primary `.zshrc` file. The numbered prefix on each file ensures they are loaded in the correct order to resolve dependencies (e.g., helpers are loaded first, aliases are defined after paths and environment variables).
+These configuration files are loaded through `init.zsh`, which sources the numbered `.zsh` files in order. The numbered prefix controls dependency order (for example, helpers load before aliases and tool integrations).
 
-To use this configuration, a user's `~/.zshrc` would typically contain a loop to source all `*.zsh` files from this directory.
+The installer symlinks this directory to `~/.config/zsh` and manages a small block in the user's `~/.zshrc`. That block should live after `source $ZSH/oh-my-zsh.sh` so Oh My Zsh initializes first.
 
-Example snippet for `~/.zshrc`:
+Managed snippet:
 
 ```zsh
-# Source all .zsh files from the zsh config directory
-ZSH_CONFIG_DIR="$HOME/Sync/dotfiles/zsh"
-if [[ -d "$ZSH_CONFIG_DIR" ]]; then
-  for config_file in "$ZSH_CONFIG_DIR"/*.zsh; do
-    source "$config_file"
-  done
-fi
+# >>> instrukt dotfiles >>>
+[[ -r "$HOME/.config/zsh/init.zsh" ]] && source "$HOME/.config/zsh/init.zsh"
+# <<< instrukt dotfiles <<<
 ```
 
 Machine-specific customizations (like unique paths or environment variables) can be added to files like `10-path.local.zsh` or `20-env.local.zsh` within this directory. These local files are not tracked by git, ensuring that personal settings don't interfere with the core configuration shared across systems.

@@ -44,6 +44,8 @@ The script should do this: \(ai.prompt).</string>
 	<string></string>
 	<key>Default Bookmark Guid</key>
 	<string>F40DE56B-13A3-4212-A778-E4C8D534C154</string>
+	<key>EnableAPIServer</key>
+	<true/>
 	<key>GlobalKeyMap</key>
 	<dict>
 		<key>0xd-0x20000-0x24</key>

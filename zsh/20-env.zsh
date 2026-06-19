@@ -1,8 +1,10 @@
 # Environment variables - shared base
 # Machine-specific env vars go in 20-env.local.zsh
 
-export LANG="en_US.UTF-8"
-export LC_ALL="en_US.UTF-8"
+export LANG="nl_NL.UTF-8"
+export LANGUAGE="en_US:en"
+export LC_MESSAGES="en_US.UTF-8"
+export LC_TIME="en_US.UTF-8"
 
 # Default editors (override in .local.zsh if needed)
 export EDITOR="${EDITOR:-vim}"
