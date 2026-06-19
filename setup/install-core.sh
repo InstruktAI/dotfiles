@@ -172,18 +172,20 @@ if [[ "$OS" == "Darwin" ]]; then
         echo "  [OK] iTerm2 prefs -> $DOTFILES/iterm2"
     fi
 
-    watcher_src="$DOTFILES/terminal/bin/appearance-watcher.swift"
     watcher_bin="$DOTFILES/terminal/bin/appearance-watcher"
-    # Rebuild only when missing or the source changed. The binary is ad-hoc
-    # signed, so each recompile changes its code hash and macOS re-prompts for
-    # Full Disk Access.
-    if command -v swiftc >/dev/null 2>&1 && [[ ! -f "$watcher_bin" || "$watcher_src" -nt "$watcher_bin" ]]; then
-        swiftc "$watcher_src" -o "$watcher_bin"
+    # The compiled binary is committed to git and synced across machines, so it
+    # works out of the box with no per-machine build. Only build when it is
+    # actually missing; never overwrite the committed binary, so its code hash
+    # stays identical everywhere (one Full Disk Access identity) and Syncthing
+    # has nothing to conflict. To rebuild after editing the source, delete the
+    # binary and re-run the installer, or run swiftc manually.
+    if [[ -f "$watcher_bin" ]]; then
+        echo "  [OK] appearance-watcher present (from git)"
+    elif command -v swiftc >/dev/null 2>&1; then
+        swiftc "$DOTFILES/terminal/bin/appearance-watcher.swift" -o "$watcher_bin"
         echo "  [BUILD] appearance-watcher"
-    elif [[ -f "$watcher_bin" ]]; then
-        echo "  [OK] appearance-watcher up to date"
     else
-        echo "  [WARN] swiftc not found and no prebuilt appearance-watcher; skipping"
+        echo "  [WARN] no appearance-watcher binary and swiftc not found; skipping"
     fi
 
     # The watcher is a daemon, not a CLI. launchd runs the real binary directly
