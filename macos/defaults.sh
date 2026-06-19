@@ -1,7 +1,7 @@
 #!/bin/bash
 # macOS system defaults - curated for modern macOS (Sequoia/Tahoe).
-# This file is the upstream template. The installer copies it to
-# defaults.local.sh once and only executes that local copy.
+# The installer runs this tracked file directly. Machine-specific overrides
+# (locale, etc.) live in macos/defaults.local.sh and are sourced at the end.
 # Run once on a new machine, or re-run to reset preferences.
 # Idempotent: safe to run multiple times.
 
@@ -269,6 +269,17 @@ defaults write com.apple.TextEdit PlainTextEncodingForWrite -int 4
 
 # Enable WebKit Developer Tools in Mac App Store
 defaults write com.apple.appstore WebKitDeveloperExtras -bool true
+
+# =============================================================================
+# Machine-specific overrides
+# =============================================================================
+
+MACOS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$MACOS_DIR/defaults.local.sh" ]]; then
+    echo "Applying machine-specific overrides..."
+    # shellcheck source=/dev/null
+    source "$MACOS_DIR/defaults.local.sh"
+fi
 
 # =============================================================================
 # Restart affected applications

@@ -142,14 +142,10 @@ fi
 
 echo ""
 echo "=== Local Config ==="
-ensure_local_file "$DOTFILES/macos/defaults.sh" "$DOTFILES/macos/defaults.local.sh"
 ensure_local_file "$DOTFILES/macos/Brewfile" "$DOTFILES/macos/Brewfile.local"
 
 while IFS= read -r example; do
     local_file="${example/.example/}"
-    if [[ "$local_file" == "$DOTFILES/macos/defaults.local.sh" ]]; then
-        continue
-    fi
     ensure_local_file "$example" "$local_file"
 done < <(find "$DOTFILES" -type f -name '*.local.example.*')
 
@@ -158,14 +154,14 @@ echo ""
 
 run_brew_bundle
 
-if [[ "$APPLY_DEFAULTS" == true && "$OS" == "Darwin" && -f "$DOTFILES/macos/defaults.local.sh" ]]; then
+if [[ "$APPLY_DEFAULTS" == true && "$OS" == "Darwin" ]]; then
     echo ""
     echo "=== macOS Defaults ==="
-    bash "$DOTFILES/macos/defaults.local.sh"
+    bash "$DOTFILES/macos/defaults.sh"
 elif [[ "$OS" == "Darwin" ]]; then
     echo ""
     echo "=== macOS Defaults ==="
-    echo "  [SKIP] Run later with: bash $DOTFILES/macos/defaults.local.sh"
+    echo "  [SKIP] Run later with: bash $DOTFILES/macos/defaults.sh"
 fi
 
 echo ""
