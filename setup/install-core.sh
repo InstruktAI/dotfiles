@@ -75,6 +75,7 @@ render_launchd_plist() {
 
     sed \
         -e "s|__HOME__|$HOME|g" \
+        -e "s|__APPEARANCE_WATCHER__|$DOTFILES/terminal/bin/appearance-watcher|g" \
         -e "s|__APPEARANCE_LATITUDE__|$(env_value APPEARANCE_LATITUDE 52.37)|g" \
         -e "s|__APPEARANCE_LONGITUDE__|$(env_value APPEARANCE_LONGITUDE 4.89)|g" \
         -e "s|__APPEARANCE_DARK_OFFSET_MINUTES__|$(env_value APPEARANCE_DARK_OFFSET_MINUTES 0)|g" \
@@ -171,14 +172,25 @@ if [[ "$OS" == "Darwin" ]]; then
         echo "  [OK] iTerm2 prefs -> $DOTFILES/iterm2"
     fi
 
-    if command -v swiftc >/dev/null 2>&1; then
-        swiftc "$DOTFILES/terminal/bin/appearance-watcher.swift" -o "$DOTFILES/terminal/bin/appearance-watcher"
+    watcher_src="$DOTFILES/terminal/bin/appearance-watcher.swift"
+    watcher_bin="$DOTFILES/terminal/bin/appearance-watcher"
+    # Rebuild only when missing or the source changed. The binary is ad-hoc
+    # signed, so each recompile changes its code hash and macOS re-prompts for
+    # Full Disk Access.
+    if command -v swiftc >/dev/null 2>&1 && [[ ! -f "$watcher_bin" || "$watcher_src" -nt "$watcher_bin" ]]; then
+        swiftc "$watcher_src" -o "$watcher_bin"
         echo "  [BUILD] appearance-watcher"
+    elif [[ -f "$watcher_bin" ]]; then
+        echo "  [OK] appearance-watcher up to date"
     else
-        echo "  [WARN] swiftc not found; using existing appearance-watcher binary"
+        echo "  [WARN] swiftc not found and no prebuilt appearance-watcher; skipping"
     fi
 
-    link "$DOTFILES/terminal/bin/appearance-watcher" "$HOME/.local/bin/appearance-watcher"
+    # The watcher is a daemon, not a CLI. launchd runs the real binary directly
+    # (see __APPEARANCE_WATCHER__ in the plist). A ~/.local/bin symlink made
+    # launchd target the symlink, which macOS lists separately from the resolved
+    # binary — two Full Disk Access entries for one program. Drop the stale link.
+    rm -f "$HOME/.local/bin/appearance-watcher"
 
     mkdir -p "$HOME/Library/LaunchAgents"
 

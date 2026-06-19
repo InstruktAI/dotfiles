@@ -6,7 +6,7 @@
     <string>ai.instrukt.appearance-watcher</string>
     <key>ProgramArguments</key>
     <array>
-        <string>__HOME__/.local/bin/appearance-watcher</string>
+        <string>__APPEARANCE_WATCHER__</string>
     </array>
     <key>RunAtLoad</key>
     <true/>

@@ -2,9 +2,8 @@
 # Bootstrap dotfiles on a new machine.
 #
 # Usage:
-#   ./install.sh                 # core setup, local defaults, Homebrew check
-#   ./install.sh --install-apps  # install missing Brewfile entries without upgrades
-#   ./install.sh --no-apps       # skip Homebrew entirely
+#   ./install.sh                 # full setup: symlinks, defaults, Homebrew packages
+#   ./install.sh --no-apps       # skip Homebrew package install
 #   ./install.sh --no-defaults   # skip macOS defaults
 
 set -euo pipefail
@@ -12,7 +11,6 @@ set -euo pipefail
 DOTFILES="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OS="$(uname -s)"
 SKIP_APPS=false
-INSTALL_APPS=false
 APPLY_DEFAULTS=true
 
 usage() {
@@ -20,9 +18,8 @@ usage() {
 Bootstrap dotfiles on a new machine.
 
 Usage:
-  ./install.sh                 # core setup, local defaults, Homebrew check
-  ./install.sh --install-apps  # install missing Brewfile entries without upgrades
-  ./install.sh --no-apps       # skip Homebrew entirely
+  ./install.sh                 # full setup: symlinks, defaults, Homebrew packages
+  ./install.sh --no-apps       # skip Homebrew package install
   ./install.sh --no-defaults   # skip macOS defaults
 EOF
 }
@@ -30,7 +27,8 @@ EOF
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --install-apps | --install-brew)
-            INSTALL_APPS=true
+            # Installing missing entries is the default now; accepted for
+            # backward compatibility.
             ;;
         --no-apps | --no-brew)
             SKIP_APPS=true
@@ -98,12 +96,7 @@ run_brew_bundle() {
         return
     fi
 
-    if [[ "$INSTALL_APPS" != true ]]; then
-        echo "  [WARN] Brewfile.local has missing entries; not installing by default."
-        echo "        Run ./install.sh --install-apps to install missing entries without upgrades."
-        return
-    fi
-
+    echo "  Installing missing Brewfile.local entries (no upgrades)..."
     HOMEBREW_BUNDLE_NO_UPGRADE=1 \
     HOMEBREW_NO_INSTALL_UPGRADE=1 \
         brew bundle install --file="$brewfile" --no-lock --no-upgrade
