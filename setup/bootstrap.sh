@@ -3,7 +3,7 @@
 #
 # Usage:
 #   ./install.sh                 # full setup: symlinks, defaults, Homebrew packages
-#   ./install.sh --diff-apps     # show Brewfile.local vs installed diff, then exit
+#   ./install.sh --diff-apps     # show what install will add, then exit
 #   ./install.sh --no-apps       # skip Homebrew package install
 #   ./install.sh --no-defaults   # skip macOS defaults
 
@@ -21,7 +21,7 @@ Bootstrap dotfiles on a new machine.
 
 Usage:
   ./install.sh                 # full setup: symlinks, defaults, Homebrew packages
-  ./install.sh --diff-apps     # show Brewfile.local vs installed diff, then exit
+  ./install.sh --diff-apps     # show what install will add, then exit
   ./install.sh --no-apps       # skip Homebrew package install
   ./install.sh --no-defaults   # skip macOS defaults
 EOF
@@ -128,31 +128,16 @@ diff_brew_bundle() {
         return
     fi
 
-    echo "=== Homebrew Diff: Brewfile.local vs installed ==="
+    echo "=== Homebrew: what ./install.sh will install ==="
     echo ""
-    echo "Declared but not installed (a normal install would add these):"
     if brew bundle check --file="$brewfile" &>/dev/null; then
-        echo "  (none - Brewfile.local is fully satisfied)"
+        echo "Nothing - everything in Brewfile.local is already installed."
     else
         brew bundle check --file="$brewfile" --verbose 2>&1 | sed 's/^/  /' || true
     fi
 
     echo ""
-    echo "Installed but not declared (candidates to add to the list or uninstall):"
-    local extra
-    # Keep the package/tap decisions; drop the cache-cleanup tail and the
-    # force-it footer (we print our own guidance below).
-    extra="$(brew bundle cleanup --file="$brewfile" 2>/dev/null \
-        | awk '/^Would .brew cleanup/{exit} /^Run .brew bundle cleanup/{exit} {print}' || true)"
-    if [[ -z "${extra// /}" ]]; then
-        echo "  (none)"
-    else
-        printf '%s\n' "$extra" | sed 's/^/  /'
-    fi
-
-    echo ""
-    echo "Edit the list:        $brewfile"
-    echo "Prune system to list: brew bundle cleanup --file=\"$brewfile\" --force"
+    echo "Remove anything you don't want from: $brewfile"
 }
 
 if [[ "$DIFF_APPS" == true ]]; then
