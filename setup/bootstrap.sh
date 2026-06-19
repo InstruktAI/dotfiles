@@ -4,6 +4,7 @@
 # Usage:
 #   ./install.sh                 # full setup: symlinks, defaults, Homebrew packages
 #   ./install.sh --diff-apps     # show what install will add, then exit
+#   ./install.sh --upgrade-apps  # safely upgrade brew packages (hold major bumps), then exit
 #   ./install.sh --no-apps       # skip Homebrew package install
 #   ./install.sh --no-defaults   # skip macOS defaults
 
@@ -13,6 +14,7 @@ DOTFILES="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OS="$(uname -s)"
 SKIP_APPS=false
 DIFF_APPS=false
+UPGRADE_APPS=false
 APPLY_DEFAULTS=true
 
 usage() {
@@ -22,6 +24,7 @@ Bootstrap dotfiles on a new machine.
 Usage:
   ./install.sh                 # full setup: symlinks, defaults, Homebrew packages
   ./install.sh --diff-apps     # show what install will add, then exit
+  ./install.sh --upgrade-apps  # safely upgrade brew packages (hold major bumps), then exit
   ./install.sh --no-apps       # skip Homebrew package install
   ./install.sh --no-defaults   # skip macOS defaults
 EOF
@@ -31,6 +34,9 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --diff-apps)
             DIFF_APPS=true
+            ;;
+        --upgrade-apps)
+            UPGRADE_APPS=true
             ;;
         --no-apps)
             SKIP_APPS=true
@@ -167,8 +173,87 @@ diff_brew_bundle() {
     echo "Remove anything you don't want from: $brewfile"
 }
 
+_is_breaking() {
+    local inst="$1" cur="$2" im cm imn cmn rest
+    im="${inst%%.*}"
+    cm="${cur%%.*}"
+    [[ "$im" != "$cm" ]] && return 0
+    # 0.x is unstable: a minor bump there can break, so treat it as breaking.
+    if [[ "$im" == "0" ]]; then
+        rest="${inst#*.}"; imn="${rest%%.*}"
+        rest="${cur#*.}"; cmn="${rest%%.*}"
+        [[ "$imn" != "$cmn" ]] && return 0
+    fi
+    return 1
+}
+
+upgrade_apps() {
+    if [[ "$OS" != "Darwin" ]]; then
+        echo "Homebrew upgrade is macOS-only."
+        return
+    fi
+    if ! command -v brew &>/dev/null; then
+        echo "Homebrew is not installed."
+        return
+    fi
+    if ! command -v jq &>/dev/null; then
+        echo "Installing jq (needed to read brew version data)..."
+        brew install jq
+    fi
+
+    echo "=== Safe Homebrew upgrade ==="
+    echo "Refreshing metadata..."
+    brew update >/dev/null || true
+
+    local outdated
+    outdated="$(brew outdated --json=v2 2>/dev/null || true)"
+
+    local safe=() held=() casks=()
+    local name inst cur
+    while IFS=$'\t' read -r name inst cur; do
+        [[ -z "$name" ]] && continue
+        if _is_breaking "$inst" "$cur"; then
+            held+=("$name ($inst -> $cur)")
+        else
+            safe+=("$name")
+        fi
+    done < <(printf '%s' "$outdated" | jq -r '.formulae[] | [.name, (.installed_versions[-1]), .current_version] | @tsv')
+
+    # Casks do not use real version numbers; never auto-upgrade, always surface.
+    while IFS=$'\t' read -r name inst cur; do
+        [[ -z "$name" ]] && continue
+        casks+=("$name ($inst -> $cur)")
+    done < <(printf '%s' "$outdated" | jq -r '.casks[] | [.name, (.installed_versions[-1]), .current_version] | @tsv')
+
+    if ((${#safe[@]} > 0)); then
+        echo ""
+        echo "Upgrading (same major line, treated as non-breaking):"
+        printf '  %s\n' "${safe[@]}"
+        brew upgrade "${safe[@]}" || echo "  [WARN] one or more upgrades failed; see output above"
+    else
+        echo ""
+        echo "No safe (non-breaking) formula upgrades available."
+    fi
+
+    if ((${#held[@]} > 0 || ${#casks[@]} > 0)); then
+        echo ""
+        echo "HELD BACK - major version change, review and upgrade manually:"
+        if ((${#held[@]} > 0)); then printf '  formula  %s\n' "${held[@]}"; fi
+        if ((${#casks[@]} > 0)); then printf '  cask     %s\n' "${casks[@]}"; fi
+        echo ""
+        echo "Upgrade any of these yourself when ready: brew upgrade <name>"
+    fi
+
+    pin_node_formula
+}
+
 if [[ "$DIFF_APPS" == true ]]; then
     diff_brew_bundle
+    exit 0
+fi
+
+if [[ "$UPGRADE_APPS" == true ]]; then
+    upgrade_apps
     exit 0
 fi
 
