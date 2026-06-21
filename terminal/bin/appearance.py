@@ -6,7 +6,7 @@
 # ]
 # ///
 """Unified appearance management - OS agnostic.
-Subcommands: get-mode, get-terminal-bg, reload, watch
+Subcommands: get-mode, get-terminal-bg, reload, apply-system, watch
 """
 
 from __future__ import annotations
@@ -35,6 +35,7 @@ APPEARANCE_LONGITUDE = os.environ.get("APPEARANCE_LONGITUDE", "4.89")
 APPEARANCE_DARK_OFFSET_MINUTES = os.environ.get("APPEARANCE_DARK_OFFSET_MINUTES", "0")
 APPEARANCE_DST_DARK_OFFSET_MINUTES = os.environ.get("APPEARANCE_DST_DARK_OFFSET_MINUTES", "0")
 APPEARANCE_CACHE_DIR = os.environ.get("APPEARANCE_CACHE_DIR", "/tmp")
+APPEARANCE_STATE_DIR = os.environ.get("APPEARANCE_STATE_DIR", "")
 APPEARANCE_LOG = os.environ.get("APPEARANCE_LOG", "1")
 
 DEFAULT_PATH_PREFIX = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
@@ -561,6 +562,65 @@ def tmux_command(args: list[str]) -> subprocess.CompletedProcess[str]:
 
 
 # ---------------------------------------------------------------------------
+# Solar transition state (edge-triggered apply-system)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class TransitionState:
+    """Per-day record of which solar transitions have already driven the OS.
+
+    `applied` flags the transition *into* each mode for the current local day,
+    so once `to dark` has fired a manual override survives until the next day's
+    crossing. `last_solar_mode` is the edge detector: a write only happens when
+    the freshly computed solar mode differs from the one last seen.
+    """
+
+    date: str = ""
+    last_solar_mode: str | None = None
+    applied: dict[str, bool] = field(default_factory=lambda: {"dark": False, "light": False})
+
+
+def transition_state_file() -> Path:
+    if APPEARANCE_STATE_DIR:
+        base = Path(APPEARANCE_STATE_DIR)
+    else:
+        xdg = os.environ.get("XDG_STATE_HOME")
+        base = (Path(xdg) if xdg else Path.home() / ".local" / "state") / "appearance"
+    return base / "transitions.json"
+
+
+def _load_transition_state() -> TransitionState:
+    path = transition_state_file()
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            applied = data.get("applied", {})
+            return TransitionState(
+                date=str(data.get("date", "")),
+                last_solar_mode=_normalize_mode(data.get("last_solar_mode")),
+                applied={
+                    "dark": bool(applied.get("dark", False)),
+                    "light": bool(applied.get("light", False)),
+                },
+            )
+        except Exception as exc:
+            log(f"apply_system transition state read failed error={exc}")
+    return TransitionState()
+
+
+def _save_transition_state(state: TransitionState) -> None:
+    path = transition_state_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "date": state.date,
+        "last_solar_mode": state.last_solar_mode,
+        "applied": state.applied,
+    }
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
 # Subcommands
 # ---------------------------------------------------------------------------
 
@@ -615,6 +675,13 @@ def cmd_reload() -> int:
 
 
 def cmd_apply_system() -> int:
+    """Drive the macOS Appearance from solar mode, but only on a genuine
+    sunrise/sunset crossing — never as a periodic reconcile.
+
+    The OS is written at most once per transition per local day. Between
+    crossings the function is inert, so a manual override is left untouched
+    until the next day's crossing in that direction.
+    """
     if not is_macos():
         print("apply-system is only supported on macOS.", file=sys.stderr)
         return 1
@@ -622,9 +689,43 @@ def cmd_apply_system() -> int:
     if mode is None:
         print("Solar appearance unavailable; leaving macOS Appearance unchanged.", file=sys.stderr)
         return 1
-    if not set_macos_appearance(mode):
-        return 1
-    return 0
+
+    today = datetime.date.today().isoformat()
+    state = _load_transition_state()
+    dirty = False
+
+    if state.date != today:
+        state.date = today
+        state.applied = {"dark": False, "light": False}
+        dirty = True
+
+    if state.last_solar_mode is None:
+        # First run with no prior state: adopt the current solar mode as the
+        # baseline without touching the OS, so an existing manual choice is
+        # never clobbered on install or after losing state.
+        state.last_solar_mode = mode
+        _save_transition_state(state)
+        log(f"apply_system seeded baseline mode={mode} without applying")
+        return 0
+
+    edge = mode != state.last_solar_mode
+    if edge:
+        state.last_solar_mode = mode
+        dirty = True
+
+    result = 0
+    if edge and not state.applied.get(mode, False):
+        if set_macos_appearance(mode):
+            state.applied[mode] = True
+            log(f"apply_system fired transition to={mode} date={today}")
+        else:
+            result = 1
+    elif edge:
+        log(f"apply_system edge to={mode} already applied today; skipping")
+
+    if dirty:
+        _save_transition_state(state)
+    return result
 
 
 def cmd_watch() -> int:
@@ -649,7 +750,7 @@ Commands:
   get-mode          Output current mode (dark/light)
   get-terminal-bg   Output terminal background hex color
   reload            Sync agent CLI themes and signal TUI refresh
-  apply-system      Set macOS Appearance from sunrise/sunset offset
+  apply-system      Set macOS Appearance once per sunrise/sunset crossing
   watch             Poll for appearance changes (Linux fallback)
 
 Environment variables:
@@ -662,6 +763,8 @@ Environment variables:
   APPEARANCE_DST_DARK_OFFSET_MINUTES
                         Extra dark offset while local DST is active (default: 0)
   APPEARANCE_CACHE_DIR  Cache directory for sunrise-sunset data (default: /tmp)
+  APPEARANCE_STATE_DIR  Directory for the apply-system transition state
+                        (default: $XDG_STATE_HOME/appearance or ~/.local/state/appearance)
   APPEARANCE_LOG        Enable logging (default: 1)
 """
     print(help_text)
