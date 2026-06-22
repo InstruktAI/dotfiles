@@ -154,6 +154,16 @@ defaults write com.apple.screencapture type -string "png"
 defaults write com.apple.screencapture disable-shadow -bool true
 
 # =============================================================================
+# Power management
+# =============================================================================
+
+# Never idle-sleep the system. These machines are reached over Screen Sharing,
+# and system sleep drops the session: the viewer auto-reconnects, the reconnect
+# packet wakes the host, and the cycle re-fires the "remotely controlled" banner
+# on a loop. Display sleep (displaysleep) is left untouched.
+sudo pmset -a sleep 0
+
+# =============================================================================
 # Finder
 # =============================================================================
 
