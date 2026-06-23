@@ -17,6 +17,12 @@ export PIPENV_VENV_IN_PROJECT=1
 # GPG TTY for signing
 export GPG_TTY=$(tty)
 
+# Truecolor: SSH forwards TERM but not COLORTERM, so apps fall back to
+# 256-color on remote shells. Assert it when missing; a terminal that
+# already advertises truecolor (local case) keeps its own value.
+: "${COLORTERM:=truecolor}"
+export COLORTERM
+
 # Preserve real terminal info for tmux theme detection
 # Only runs outside tmux when tmux server exists
 if [[ "$TERM_PROGRAM" != "tmux" && -n "$TERM_PROGRAM" ]]; then
