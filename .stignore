@@ -1,0 +1,8 @@
+// Syncthing per-device ignore list. This .stignore is itself not synced,
+// so entries here keep files local to THIS machine only.
+
+// Machine-local config — must NOT propagate to other devices. Mirrors the
+// "machine-specific configs" section of .gitignore.
+*.local.sh
+*.local.zsh
+macos/Brewfile.local

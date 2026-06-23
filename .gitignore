@@ -2,7 +2,6 @@
 .stfolder/
 .stversions/
 *.sync-conflict-*
-.stignore
 
 # macOS metadata
 .DS_Store
