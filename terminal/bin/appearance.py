@@ -24,7 +24,7 @@ import tomllib
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Protocol
 
 from instrukt_ai_logging import configure_logging, get_logger
 
@@ -36,19 +36,12 @@ APPEARANCE_DARK_OFFSET_MINUTES = os.environ.get("APPEARANCE_DARK_OFFSET_MINUTES"
 APPEARANCE_DST_DARK_OFFSET_MINUTES = os.environ.get("APPEARANCE_DST_DARK_OFFSET_MINUTES", "0")
 APPEARANCE_CACHE_DIR = os.environ.get("APPEARANCE_CACHE_DIR", "/tmp")
 APPEARANCE_STATE_DIR = os.environ.get("APPEARANCE_STATE_DIR", "")
-APPEARANCE_LOG = os.environ.get("APPEARANCE_LOG", "1")
 
 DEFAULT_PATH_PREFIX = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 os.environ["PATH"] = f"{DEFAULT_PATH_PREFIX}:{os.environ.get('PATH', '')}"
 
 configure_logging("appearance")
-LOGGER = get_logger("appearance")
-
-
-def log(message: str) -> None:
-    if APPEARANCE_LOG != "1":
-        return
-    LOGGER.info("event", detail=message)
+logger = get_logger("appearance")
 
 
 def is_macos() -> bool:
@@ -84,11 +77,11 @@ def parse_coordinate(value: str, *, minimum: float, maximum: float, name: str) -
     try:
         coordinate = float(value)
     except ValueError:
-        log(f"is_daylight invalid {name} value={value}")
+        logger.warning("invalid_coordinate", name=name, value=value)
         return None
     if minimum <= coordinate <= maximum:
         return coordinate
-    log(f"is_daylight invalid {name} value={value}")
+    logger.warning("invalid_coordinate", name=name, value=value)
     return None
 
 
@@ -107,7 +100,7 @@ def is_daylight(*, allow_fallback: bool = True) -> bool | None:
             return None
         hour = datetime.datetime.now().hour
         daylight = 6 <= hour < 18
-        log(f"is_daylight using hour fallback daylight={daylight}")
+        logger.debug("solar_hour_fallback", daylight=daylight)
         return daylight
 
     cache_file = solar_cache_file(latitude, longitude)
@@ -138,10 +131,10 @@ def is_daylight(*, allow_fallback: bool = True) -> bool | None:
                 sunset = results.get("sunset")
                 if sunrise and sunset:
                     daylight = is_now_between(sunrise, sunset)
-                    log("is_daylight using cached sunrise-sunset data")
+                    logger.debug("solar_source", source="cache")
                     return daylight
             except Exception as exc:
-                log(f"is_daylight cache read failed error={exc}")
+                logger.warning("solar_cache_read_failed", error=str(exc))
 
     url = (
         "https://api.sunrise-sunset.org/json"
@@ -163,17 +156,17 @@ def is_daylight(*, allow_fallback: bool = True) -> bool | None:
             sunset = results.get("sunset")
             if sunrise and sunset:
                 daylight = is_now_between(sunrise, sunset)
-                log("is_daylight using live sunrise-sunset data")
+                logger.debug("solar_source", source="api")
                 return daylight
-        log(f"is_daylight sunrise-sunset API returned status={data.get('status')}")
+        logger.warning("solar_api_status", status=data.get("status"))
     except Exception as exc:
-        log(f"is_daylight sunrise-sunset API failed error={exc}")
+        logger.warning("solar_api_failed", error=str(exc))
 
     if not allow_fallback:
         return None
     hour = datetime.datetime.now().hour
     daylight = 6 <= hour < 18
-    log(f"is_daylight using hour fallback daylight={daylight}")
+    logger.debug("solar_hour_fallback", daylight=daylight)
     return daylight
 
 
@@ -181,53 +174,101 @@ def get_solar_mode(*, allow_fallback: bool = True) -> str | None:
     offset = dark_offset()
     daylight = is_daylight(allow_fallback=allow_fallback)
     if daylight is None:
-        log(f"get_solar_mode unavailable dark_offset_minutes={int(offset.total_seconds() / 60)}")
+        logger.debug("solar_mode_unavailable", dark_offset_minutes=int(offset.total_seconds() / 60))
         return None
     if daylight:
-        log(f"get_solar_mode detected light from sunrise-sunset dark_offset_minutes={int(offset.total_seconds() / 60)}")
+        logger.debug("solar_mode", mode="light", dark_offset_minutes=int(offset.total_seconds() / 60))
         return "light"
-    log(f"get_solar_mode detected dark from sunrise-sunset dark_offset_minutes={int(offset.total_seconds() / 60)}")
+    logger.debug("solar_mode", mode="dark", dark_offset_minutes=int(offset.total_seconds() / 60))
     return "dark"
 
 
 def get_mode() -> str:
     env_mode = os.environ.get("APPEARANCE_MODE")
     if env_mode:
-        log(f"get_mode using APPEARANCE_MODE={env_mode}")
+        logger.debug("mode_source", source="env", mode=env_mode)
         return env_mode
 
-    if is_macos():
-        mode = get_macos_appearance_mode()
-        log(f"get_mode detected {mode} from macOS defaults")
-        return mode
-
-    desktop_mode = get_linux_desktop_mode()
-    if desktop_mode:
-        log(f"get_mode detected {desktop_mode} from freedesktop color-scheme")
-        return desktop_mode
+    native = PLATFORM.native_mode()
+    if native:
+        logger.debug("mode_source", source="native", mode=native)
+        return native
 
     mode = get_solar_mode()
     if mode is None:
         mode = "light"
-        log("get_mode defaulting to light because solar mode is unavailable")
-    log(f"get_mode detected {mode} from sunrise-sunset")
+        logger.debug("mode_default", mode=mode, reason="solar_unavailable")
+        return mode
+    logger.debug("mode_source", source="solar", mode=mode)
     return mode
 
 
-def get_linux_desktop_mode() -> str | None:
-    """Read the desktop's dark/light preference — the real Linux appearance signal.
+# ---------------------------------------------------------------------------
+# Platform abstraction — native appearance detection and application
+# ---------------------------------------------------------------------------
 
-    Queries the XDG desktop portal setting ``org.freedesktop.appearance
-    color-scheme`` (0 = no preference, 1 = dark, 2 = light), which GNOME, KDE,
-    labwc/wayfire and the rest expose over D-Bus. Falls back to the GNOME
-    gsettings key when no portal is running. Returns None when neither is
-    available (e.g. a headless box), so the caller drops to solar computation.
-    """
-    for reader in (_portal_color_scheme, _gsettings_color_scheme):
-        mode = reader()
-        if mode:
-            return mode
-    return None
+
+class Platform(Protocol):
+    def native_mode(self) -> str | None:
+        """The OS's own dark/light preference, or None when it expresses none."""
+        ...
+
+    def apply_mode(self, mode: str) -> bool:
+        """Drive the OS appearance to ``mode``; return whether it is now set."""
+        ...
+
+
+class MacOSPlatform:
+    def native_mode(self) -> str | None:
+        result = run_command(["defaults", "read", "-g", "AppleInterfaceStyle"])
+        if result.returncode == 0 and "Dark" in result.stdout:
+            return "dark"
+        return "light"
+
+    def apply_mode(self, mode: str) -> bool:
+        if mode not in {"dark", "light"}:
+            return False
+        if self.native_mode() == mode:
+            logger.debug("apply_skip", platform="macos", mode=mode, reason="already")
+            return True
+        enabled = "true" if mode == "dark" else "false"
+        result = run_command(
+            [
+                "osascript",
+                "-e",
+                f'tell application "System Events" to tell appearance preferences to set dark mode to {enabled}',
+            ]
+        )
+        if result.returncode != 0:
+            logger.error("apply_failed", platform="macos", mode=mode, error=result.stderr.strip())
+            return False
+        logger.debug("apply_set", platform="macos", mode=mode)
+        return True
+
+
+class LinuxPlatform:
+    def native_mode(self) -> str | None:
+        for reader in (_portal_color_scheme, _gsettings_color_scheme):
+            mode = reader()
+            if mode:
+                return mode
+        return None
+
+    def apply_mode(self, mode: str) -> bool:
+        if mode not in {"dark", "light"}:
+            return False
+        if self.native_mode() == mode:
+            logger.debug("apply_skip", platform="linux", mode=mode, reason="already")
+            return True
+        scheme = "prefer-dark" if mode == "dark" else "prefer-light"
+        result = run_command(
+            ["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", scheme]
+        )
+        if result.returncode != 0:
+            logger.error("apply_failed", platform="linux", mode=mode, error=result.stderr.strip())
+            return False
+        logger.debug("apply_set", platform="linux", mode=mode)
+        return True
 
 
 def _portal_color_scheme() -> str | None:
@@ -267,36 +308,11 @@ def _gsettings_color_scheme() -> str | None:
     return None
 
 
-def get_macos_appearance_mode() -> str:
-    try:
-        result = run_command(["defaults", "read", "-g", "AppleInterfaceStyle"])
-        if result.returncode == 0 and "Dark" in result.stdout:
-            return "dark"
-    except Exception:
-        pass
-    return "light"
+def current_platform() -> Platform:
+    return MacOSPlatform() if is_macos() else LinuxPlatform()
 
 
-def set_macos_appearance(mode: str) -> bool:
-    if mode not in {"dark", "light"}:
-        return False
-    current = get_macos_appearance_mode()
-    if current == mode:
-        log(f"apply_system macOS appearance already mode={mode}")
-        return True
-    enabled = "true" if mode == "dark" else "false"
-    result = run_command(
-        [
-            "osascript",
-            "-e",
-            f'tell application "System Events" to tell appearance preferences to set dark mode to {enabled}',
-        ]
-    )
-    if result.returncode != 0:
-        log(f"apply_system failed mode={mode} error={result.stderr.strip()}")
-        return False
-    log(f"apply_system set macOS appearance mode={mode}")
-    return True
+PLATFORM: Platform = current_platform()
 
 
 # ---------------------------------------------------------------------------
@@ -376,18 +392,15 @@ def get_terminal_bg_from_iterm(is_dark: bool) -> Optional[str]:
 def get_terminal_bg() -> Optional[str]:
     env_bg = os.environ.get("TERMINAL_BG")
     if env_bg:
-        log(f"get_terminal_bg using TERMINAL_BG={env_bg}")
+        logger.debug("terminal_bg_source", source="env", value=env_bg)
         return env_bg
 
-    if is_macos():
-        mode = get_mode()
-        is_dark = mode == "dark"
-        bg = get_terminal_bg_from_iterm(is_dark)
-        if bg:
-            log("get_terminal_bg detected from iTerm profile")
-            return bg
-
-    return None
+    if not is_macos():
+        return None
+    bg = get_terminal_bg_from_iterm(get_mode() == "dark")
+    if bg:
+        logger.debug("terminal_bg_source", source="iterm")
+    return bg
 
 
 # ---------------------------------------------------------------------------
@@ -605,9 +618,9 @@ def sync_agent_themes(mode: str, state: dict[str, object]) -> None:
                 continue
             try:
                 _write_agent_theme(agent, filepath, target)
-                log(f"reload {agent.key} theme synced file={filepath} mode={mode}")
+                logger.debug("agent_theme_synced", agent=agent.key, file=str(filepath), mode=mode)
             except Exception as exc:
-                log(f"reload {agent.key} theme failed file={filepath} error={exc}")
+                logger.warning("agent_theme_failed", agent=agent.key, file=str(filepath), error=str(exc))
 
 
 # ---------------------------------------------------------------------------
@@ -663,7 +676,7 @@ def _load_transition_state() -> TransitionState:
                 },
             )
         except Exception as exc:
-            log(f"apply_system transition state read failed error={exc}")
+            logger.warning("transition_state_read_failed", error=str(exc))
     return TransitionState()
 
 
@@ -697,7 +710,7 @@ def cmd_get_terminal_bg() -> int:
 
 
 def reload_mode(mode: str) -> int:
-    log(f"reload start pid={os.getpid()} mode={mode}")
+    logger.debug("reload_start", pid=os.getpid(), mode=mode)
 
     state = _load_agent_state()
     sync_agent_themes(mode, state)
@@ -724,7 +737,7 @@ def reload_mode(mode: str) -> int:
                 check=False,
             )
 
-    log("reload complete")
+    logger.debug("reload_complete")
     return 0
 
 
@@ -733,19 +746,16 @@ def cmd_reload() -> int:
 
 
 def cmd_apply_system() -> int:
-    """Drive the macOS Appearance from solar mode, but only on a genuine
+    """Drive the OS appearance from solar mode, but only on a genuine
     sunrise/sunset crossing — never as a periodic reconcile.
 
     The OS is written at most once per transition per local day. Between
     crossings the function is inert, so a manual override is left untouched
     until the next day's crossing in that direction.
     """
-    if not is_macos():
-        print("apply-system is only supported on macOS.", file=sys.stderr)
-        return 1
     mode = get_solar_mode(allow_fallback=False)
     if mode is None:
-        print("Solar appearance unavailable; leaving macOS Appearance unchanged.", file=sys.stderr)
+        print("Solar appearance unavailable; leaving OS appearance unchanged.", file=sys.stderr)
         return 1
 
     today = datetime.date.today().isoformat()
@@ -763,7 +773,7 @@ def cmd_apply_system() -> int:
         # never clobbered on install or after losing state.
         state.last_solar_mode = mode
         _save_transition_state(state)
-        log(f"apply_system seeded baseline mode={mode} without applying")
+        logger.debug("apply_system_seeded", mode=mode)
         return 0
 
     edge = mode != state.last_solar_mode
@@ -773,13 +783,13 @@ def cmd_apply_system() -> int:
 
     result = 0
     if edge and not state.applied.get(mode, False):
-        if set_macos_appearance(mode):
+        if PLATFORM.apply_mode(mode):
             state.applied[mode] = True
-            log(f"apply_system fired transition to={mode} date={today}")
+            logger.info("apply_system_transition", mode=mode, date=today)
         else:
             result = 1
     elif edge:
-        log(f"apply_system edge to={mode} already applied today; skipping")
+        logger.debug("apply_system_skip", mode=mode, reason="already_applied")
 
     if dirty:
         _save_transition_state(state)
@@ -808,7 +818,7 @@ Commands:
   get-mode          Output current mode (dark/light)
   get-terminal-bg   Output terminal background hex color
   reload            Sync agent CLI themes and signal TUI refresh
-  apply-system      Set macOS Appearance once per sunrise/sunset crossing
+  apply-system      Drive OS appearance once per sunrise/sunset crossing
   watch             Poll for appearance changes (Linux fallback)
 
 Environment variables:
@@ -823,7 +833,7 @@ Environment variables:
   APPEARANCE_CACHE_DIR  Cache directory for sunrise-sunset data (default: /tmp)
   APPEARANCE_STATE_DIR  Directory for the apply-system transition state
                         (default: $XDG_STATE_HOME/appearance or ~/.local/state/appearance)
-  APPEARANCE_LOG        Enable logging (default: 1)
+  APPEARANCE_LOG_LEVEL  Log level: DEBUG/INFO/WARNING/ERROR (default: INFO)
 """
     print(help_text)
     return 0
