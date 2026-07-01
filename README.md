@@ -22,8 +22,9 @@ pre-existing files, reuses correct symlinks, and skips work already done.
 
 1. Installs Homebrew, Oh My Zsh, and Bun if missing.
 2. Seeds machine-local override files from their tracked examples.
-3. Runs `setup/install-core.sh` to create symlinks, build the macOS appearance
-   watcher, and install launchd agents.
+3. Runs `setup/install-core.sh` to create symlinks, wire `~/.zshrc`, and provision the
+   appearance log directory. The appearance daemon/service tier is installed
+   separately with `make install-runtime`.
 4. Checks/installs Homebrew packages from `macos/Brewfile.local`.
 5. Applies macOS defaults from `macos/defaults.local.sh`.
 
@@ -58,8 +59,10 @@ The installation engine.
 
 - `bootstrap.sh` — top-level orchestration (Homebrew/Oh My Zsh/Bun, local file
   seeding, brew bundle, macOS defaults).
-- `install-core.sh` — idempotent symlinks, `~/.zshrc` activation block, macOS
-  appearance watcher build, and launchd agent rendering/loading.
+- `install-core.sh` — user tier: idempotent symlinks, `~/.zshrc` activation block,
+  iTerm2 prefs, and appearance log-directory provisioning.
+- `install-runtime.sh` — daemon/service tier: launchd agents (Swift watcher + solar
+  job) on macOS, or a systemd `--user` service on Linux. Run via `make install-runtime`.
 - `import-gpg-key.sh` / `export-gpg-key.sh` — manual GPG key transfer helpers.
 
 The `~/.zshrc` activation inserts a managed block after `source $ZSH/oh-my-zsh.sh`
@@ -124,12 +127,13 @@ switching.
 
 ### Installation
 
-`appearance` is installed by the top-level `./install.sh`. On macOS that also:
+Two tiers, both idempotent:
 
-1. Symlinks `bin/appearance` to `~/.local/bin/`.
-2. Symlinks `tmux.conf` to `~/.tmux.conf`.
-3. Compiles the Swift watcher and installs launchd jobs that watch macOS
-   Appearance changes and apply the solar appearance schedule.
+- **`make install`** symlinks `bin/appearance.py` to `~/.local/bin/appearance`, symlinks
+  `tmux.conf` to `~/.tmux.conf`, and provisions the appearance log directory.
+- **`make install-runtime`** installs the service tier: on macOS it compiles the Swift
+  watcher and loads the launchd jobs (Appearance-change watcher + solar `apply-system`);
+  on Linux it enables a systemd `--user` service running `appearance watch`.
 
 `appearance` is a uv script. Its Python dependencies are declared inline in
 `bin/appearance.py` and resolved by `uv run --script`; the installer does not
@@ -141,28 +145,26 @@ directory on first use.
 
 #### Mode Detection Priority
 
-1. `APPEARANCE_MODE` environment variable (from SSH host)
-2. macOS: `defaults read -g AppleInterfaceStyle`
-3. Linux: Sunrise/sunset API based on location
+Resolved behind a `Platform` seam (`MacOSPlatform` / `LinuxPlatform`):
+
+1. `APPEARANCE_MODE` environment variable (e.g. forwarded from an SSH host)
+2. The platform's native signal — macOS `AppleInterfaceStyle`; Linux freedesktop
+   `color-scheme` via the XDG desktop portal, falling back to `gsettings`
+3. Solar (sunrise/sunset) when the platform expresses no preference
 
 #### macOS System Appearance Schedule
 
-`appearance apply-system` sets macOS Appearance itself from sunrise/sunset. The
-installed `ai.instrukt.appearance-system` LaunchAgent runs it every five minutes.
-By default, it adds a 60 minute early-dark correction only while the local timezone
-is in daylight saving time:
+`appearance apply-system` drives the OS appearance from sunrise/sunset, once per genuine
+crossing per day. On macOS the `ai.instrukt.appearance-system` LaunchAgent runs it every
+five minutes; the Swift watcher then observes the Appearance change and syncs tmux plus
+agent CLI themes. It is cross-platform — on Linux it sets `color-scheme` via `gsettings`.
 
-```xml
-<key>APPEARANCE_DST_DARK_OFFSET_MINUTES</key>
-<string>60</string>
-```
-
-Change that value in `.env` and re-run `./install.sh` to adjust the DST
-correction. `launchd` does not read shell startup files or `.env` directly;
-`install.sh` renders the LaunchAgent plist from the current shell environment
-first, then `.env`, then the defaults in the installer. Use
-`APPEARANCE_DARK_OFFSET_MINUTES` only for a year-round offset. The existing watcher
-then observes the macOS Appearance change and syncs tmux plus agent CLI themes.
+The early-dark offsets default to 0. Set them in `.env` and re-run
+`make install-runtime` to adjust. Neither launchd nor systemd reads shell startup files
+or `.env` directly; `install-runtime.sh` renders the service definition from the current
+shell environment first, then `.env`, then the installer defaults. Use
+`APPEARANCE_DARK_OFFSET_MINUTES` for a year-round offset and
+`APPEARANCE_DST_DARK_OFFSET_MINUTES` for extra offset only while local DST is active.
 
 Effective dark start:
 
@@ -246,7 +248,7 @@ appearance reload           # Reload all themes
 appearance apply-system     # Set macOS Appearance from solar schedule
 appearance tmux-theme       # Generate /tmp/tmux-theme.conf
 appearance focus-pane PID   # Handle tmux pane focus
-appearance watch            # Poll for changes (Linux)
+appearance watch            # Linux run loop: poll every 5m, reload on change
 ```
 
 ### Environment Variables
@@ -264,7 +266,7 @@ appearance watch            # Poll for changes (Linux)
 | `APPEARANCE_STATUS_BG_PERCENT` | 10 | Status bar background blend |
 | `APPEARANCE_STATUS_FG_PERCENT` | 40 | Status bar foreground blend |
 | `APPEARANCE_FOCUS_DIM_PERCENT` | 10 | Inactive pane dim percentage |
-| `APPEARANCE_LOG` | 1 | Enable `appearance` runtime logging |
+| `APPEARANCE_LOG_LEVEL` | INFO | Logger level: DEBUG/INFO/WARNING/ERROR |
 | `INSTRUKT_AI_LOG_ROOT` | `/var/log/instrukt-ai` | Override root for InstruktAI logs |
 
 Runtime logs are written through `instrukt_ai_logging` and read with
@@ -277,30 +279,27 @@ set, the file is `$INSTRUKT_AI_LOG_ROOT/appearance/appearance.log`.
 ```
 terminal/
 ├── bin/
-│   ├── appearance              # Main script (python)
+│   ├── appearance.py            # Main script (uv/python); symlinked to ~/.local/bin/appearance
 │   └── appearance-watcher.swift # macOS watcher (Swift)
-├── launchd/
+├── launchd/                     # macOS service tier
 │   ├── ai.instrukt.appearance-system.plist
 │   └── ai.instrukt.appearance-watcher.plist
-├── agent_state.json            # Local ignored preference memory/provenance
-└── tmux.conf                   # Shared tmux configuration
+├── systemd/
+│   └── appearance.service       # Linux service tier (systemd --user)
+├── agent_state.json             # Local ignored preference memory/provenance
+└── tmux.conf                    # Shared tmux configuration
 ```
 
 ### Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  macOS Host                                         │
-│  ├── appearance-watcher detects mode changes        │
-│  ├── appearance get-mode / get-terminal-bg          │
-│  └── Passes APPEARANCE_MODE, TERMINAL_BG via SSH    │
-└─────────────────────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────┐
-│  Remote (Linux/RPi)                                 │
-│  ├── Reads env vars from SSH                        │
-│  ├── appearance reload applies theme                │
-│  └── No local detection needed                      │
-└─────────────────────────────────────────────────────┘
+macOS host
+  ├── Swift watcher detects OS Appearance changes (event-driven) → appearance reload
+  ├── launchd runs apply-system every 5m for the solar offset
+  └── appearance get-mode / get-terminal-bg; may forward APPEARANCE_MODE/TERMINAL_BG over SSH
+
+Linux / RPi
+  ├── Platform seam detects mode: freedesktop color-scheme (portal/gsettings) or solar
+  ├── systemd --user service polls every 5m and reloads on change
+  └── also accepts APPEARANCE_MODE/TERMINAL_BG forwarded over SSH
 ```
