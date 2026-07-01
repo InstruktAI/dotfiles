@@ -12,7 +12,7 @@ The setup is heavily geared towards `zsh` as the primary shell, `tmux` for termi
 
 *   **Idempotent Installation**: The main `install.sh` script is designed to be run multiple times without causing issues. It creates backups of existing files and correctly handles symlinks.
 *   **zsh-centric**: The shell environment is managed through a series of files in the `zsh/` directory, loaded in a specific order. This includes helpers, path management, environment variables, secrets (expected to be in a separate file), aliases, and tool-specific initializations.
-*   **Cross-Platform Terminal Theming**: The `terminal/` directory contains a sophisticated system for synchronizing dark/light mode across the terminal, `tmux`, and even CLI tools. On macOS, it uses a native Swift application (`appearance-watcher`) to monitor system-wide appearance changes. These settings can be propagated to remote Linux machines over SSH.
+*   **Cross-Platform Terminal Theming**: The `terminal/` directory synchronizes dark/light mode across the terminal, `tmux`, and CLI tools. macOS uses a native Swift watcher (`appearance-watcher`) for event-driven changes plus a launchd solar job; Linux uses a systemd `--user` service that polls. `APPEARANCE_MODE`/`TERMINAL_BG` env overrides let a host's theme be replicated across machines.
 *   **Tool Integrations**: The configuration includes setup for many common developer tools, such as:
     *   `git` (with many aliases)
     *   `docker` and `docker compose`
@@ -24,19 +24,22 @@ The setup is heavily geared towards `zsh` as the primary shell, `tmux` for termi
 
 ## Usage and Installation
 
-The primary way to use this repository is to run the main installer script.
+The primary entrypoint is the `Makefile`.
 
-**Installation Command:**
+**Installation Commands:**
 
 ```bash
-./install.sh
+make install          # user tier: symlinks, shell activation, log provisioning
+make install-runtime  # daemon tier: launchd (macOS) or systemd --user (Linux)
 ```
 
-**What it does:**
+**What `make install` does:**
 
 1.  Symlinks the `zsh/` directory to `~/.config/zsh`.
 2.  Symlinks `terminal/bin/appearance.py` to `~/.local/bin/appearance` (requires `~/.local/bin` to be in the `PATH`).
 3.  Symlinks `terminal/tmux.conf` to `~/.tmux.conf`.
-4.  On macOS, it compiles and installs a Swift-based `appearance-watcher` and sets up a `launchd` agent to run it automatically.
+4.  Provisions the appearance log directory under `/var/log/instrukt-ai`.
+
+**What `make install-runtime` does:** installs the appearance service tier — on macOS the launchd agents (the Swift watcher and the solar `apply-system` job); on Linux a systemd `--user` service running `appearance watch`.
 
 After running the script, you may need to update your `~/.zshrc` to source the new configuration, as prompted by the script.
