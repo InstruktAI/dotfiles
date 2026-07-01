@@ -806,12 +806,13 @@ def cmd_watch() -> int:
 
     print("Starting appearance watcher (polling)...")
     last_mode = get_mode()
+    reload_mode(last_mode)
     while True:
         time.sleep(POLL_INTERVAL_SECONDS)
         current_mode = get_mode()
         if current_mode != last_mode:
             last_mode = current_mode
-            cmd_reload()
+            reload_mode(current_mode)
 
 
 def cmd_help() -> int:
