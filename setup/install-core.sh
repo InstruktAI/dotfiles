@@ -176,6 +176,17 @@ mkdir -p "$HOME/.local/bin"
 link "$DOTFILES/terminal/bin/appearance.py" "$HOME/.local/bin/appearance"
 link "$DOTFILES/terminal/tmux.conf" "$HOME/.tmux.conf"
 
+# appearance logs through the shared InstruktAI logger, which writes under the
+# canonical /var/log/instrukt-ai/<app> root. Provision its subdir the same way
+# TeleClaude provisions its own, locating the provisioner beside telec on PATH
+# (TeleClaude's install path differs per machine).
+if telec_bin="$(command -v telec)"; then
+    provision_logs="$(dirname "$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$telec_bin")")/provision-logs.sh"
+    if [[ -x "$provision_logs" ]]; then
+        "$provision_logs" appearance --non-interactive && echo "  [OK] appearance log dir provisioned"
+    fi
+fi
+
 if [[ "$OS" == "Darwin" ]]; then
     if [[ -d "$DOTFILES/iterm2" ]]; then
         iterm_folder="$(defaults read com.googlecode.iterm2 PrefsCustomFolder 2>/dev/null || true)"
