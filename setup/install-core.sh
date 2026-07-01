@@ -79,7 +79,7 @@ render_launchd_plist() {
         -e "s|__APPEARANCE_LATITUDE__|$(env_value APPEARANCE_LATITUDE 52.37)|g" \
         -e "s|__APPEARANCE_LONGITUDE__|$(env_value APPEARANCE_LONGITUDE 4.89)|g" \
         -e "s|__APPEARANCE_DARK_OFFSET_MINUTES__|$(env_value APPEARANCE_DARK_OFFSET_MINUTES 0)|g" \
-        -e "s|__APPEARANCE_DST_DARK_OFFSET_MINUTES__|$(env_value APPEARANCE_DST_DARK_OFFSET_MINUTES 60)|g" \
+        -e "s|__APPEARANCE_DST_DARK_OFFSET_MINUTES__|$(env_value APPEARANCE_DST_DARK_OFFSET_MINUTES 0)|g" \
         "$src" > "$dst"
 }
 
@@ -164,8 +164,6 @@ install_zsh_activation() {
 
 echo "=== ZSH ==="
 link "$DOTFILES/zsh" "$HOME/.config/zsh"
-# .zshenv is sourced for non-interactive ssh shells; without it PATH (Homebrew,
-# toolchains) is missing for cross-computer tmux attach and other ssh-invoked tools.
 link "$DOTFILES/zsh/zshenv" "$HOME/.zshenv"
 install_zsh_activation
 
@@ -177,11 +175,9 @@ link "$DOTFILES/terminal/bin/appearance.py" "$HOME/.local/bin/appearance"
 link "$DOTFILES/terminal/tmux.conf" "$HOME/.tmux.conf"
 
 # appearance logs through the shared InstruktAI logger, which writes under the
-# canonical /var/log/instrukt-ai/<app> root. Provision its subdir the same way
-# TeleClaude provisions its own, locating the provisioner beside telec on PATH
-# (TeleClaude's install path differs per machine).
+# canonical /var/log/instrukt-ai/<app> root.
 if telec_bin="$(command -v telec)"; then
-    provision_logs="$(dirname "$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$telec_bin")")/provision-logs.sh"
+    provision_logs="$(dirname "$(readlink "$telec_bin")")/provision-logs.sh"
     if [[ -x "$provision_logs" ]]; then
         "$provision_logs" appearance --non-interactive && echo "  [OK] appearance log dir provisioned"
     fi
