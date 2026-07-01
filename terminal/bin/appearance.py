@@ -201,12 +201,70 @@ def get_mode() -> str:
         log(f"get_mode detected {mode} from macOS defaults")
         return mode
 
+    desktop_mode = get_linux_desktop_mode()
+    if desktop_mode:
+        log(f"get_mode detected {desktop_mode} from freedesktop color-scheme")
+        return desktop_mode
+
     mode = get_solar_mode()
     if mode is None:
         mode = "light"
         log("get_mode defaulting to light because solar mode is unavailable")
     log(f"get_mode detected {mode} from sunrise-sunset")
     return mode
+
+
+def get_linux_desktop_mode() -> str | None:
+    """Read the desktop's dark/light preference — the real Linux appearance signal.
+
+    Queries the XDG desktop portal setting ``org.freedesktop.appearance
+    color-scheme`` (0 = no preference, 1 = dark, 2 = light), which GNOME, KDE,
+    labwc/wayfire and the rest expose over D-Bus. Falls back to the GNOME
+    gsettings key when no portal is running. Returns None when neither is
+    available (e.g. a headless box), so the caller drops to solar computation.
+    """
+    for reader in (_portal_color_scheme, _gsettings_color_scheme):
+        mode = reader()
+        if mode:
+            return mode
+    return None
+
+
+def _portal_color_scheme() -> str | None:
+    result = run_command(
+        [
+            "gdbus", "call", "--session",
+            "--dest", "org.freedesktop.portal.Desktop",
+            "--object-path", "/org/freedesktop/portal/desktop",
+            "--method", "org.freedesktop.portal.Settings.Read",
+            "org.freedesktop.appearance", "color-scheme",
+        ]
+    )
+    if result.returncode != 0:
+        return None
+    match = re.search(r"uint32\s+(\d+)", result.stdout)
+    if not match:
+        return None
+    value = match.group(1)
+    if value == "1":
+        return "dark"
+    if value == "2":
+        return "light"
+    return None  # 0 = no preference; let solar decide
+
+
+def _gsettings_color_scheme() -> str | None:
+    result = run_command(
+        ["gsettings", "get", "org.gnome.desktop.interface", "color-scheme"]
+    )
+    if result.returncode != 0:
+        return None
+    value = result.stdout.strip().strip("'")
+    if value == "prefer-dark":
+        return "dark"
+    if value in {"prefer-light", "default"}:
+        return "light"
+    return None
 
 
 def get_macos_appearance_mode() -> str:
