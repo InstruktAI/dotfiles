@@ -117,10 +117,10 @@ switching.
 
 ### Features
 
-- **Automatic mode detection**: macOS system preferences or sunrise/sunset API.
+- **Automatic mode detection**: native OS signal (macOS Appearance, Linux desktop
+  `color-scheme`) or solar (sunrise/sunset).
 - **Terminal background detection**: Reads iTerm2 configuration on macOS.
 - **Environment passthrough**: Host passes settings to remote sessions via SSH.
-- **tmux theming**: Dynamic borders, status bar, and pane styling.
 - **CLI theme sync**: Updates Claude, Antigravity CLI, and Codex themes.
 - **System appearance automation**: macOS Appearance can follow sunrise/sunset
   with a configurable early-dark offset.
@@ -245,9 +245,7 @@ imperative mode-to-theme mapping.
 appearance get-mode         # Output: dark or light
 appearance get-terminal-bg  # Output: #rrggbb
 appearance reload           # Reload all themes
-appearance apply-system     # Set macOS Appearance from solar schedule
-appearance tmux-theme       # Generate /tmp/tmux-theme.conf
-appearance focus-pane PID   # Handle tmux pane focus
+appearance apply-system     # Drive OS appearance from the solar schedule
 appearance watch            # Linux run loop: poll every 5m, reload on change
 ```
 
@@ -262,10 +260,6 @@ appearance watch            # Linux run loop: poll every 5m, reload on change
 | `APPEARANCE_DARK_OFFSET_MINUTES` | 0 | Always start dark mode this many minutes before sunset |
 | `APPEARANCE_DST_DARK_OFFSET_MINUTES` | 0 | Extra dark offset while local DST is active |
 | `APPEARANCE_CACHE_DIR` | `/tmp` | Directory for date/location-keyed sunrise/sunset cache files |
-| `APPEARANCE_BORDER_PERCENT` | 15 | Border blend percentage |
-| `APPEARANCE_STATUS_BG_PERCENT` | 10 | Status bar background blend |
-| `APPEARANCE_STATUS_FG_PERCENT` | 40 | Status bar foreground blend |
-| `APPEARANCE_FOCUS_DIM_PERCENT` | 10 | Inactive pane dim percentage |
 | `APPEARANCE_LOG_LEVEL` | INFO | Logger level: DEBUG/INFO/WARNING/ERROR |
 | `INSTRUKT_AI_LOG_ROOT` | `/var/log/instrukt-ai` | Override root for InstruktAI logs |
 
