@@ -796,15 +796,18 @@ def cmd_apply_system() -> int:
     return result
 
 
+POLL_INTERVAL_SECONDS = 300
+
+
 def cmd_watch() -> int:
     if is_macos():
         print("On macOS, use the Swift-based appearance-watcher instead.")
-        print("This polling watcher is for Linux fallback only.")
+        print("This polling watcher is for Linux.")
 
     print("Starting appearance watcher (polling)...")
     last_mode = get_mode()
     while True:
-        time.sleep(60)
+        time.sleep(POLL_INTERVAL_SECONDS)
         current_mode = get_mode()
         if current_mode != last_mode:
             last_mode = current_mode

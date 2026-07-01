@@ -1,0 +1,15 @@
+[Unit]
+Description=Appearance watcher: keep terminal and agent themes in sync with dark/light
+
+[Service]
+Type=simple
+ExecStart=__HOME__/.local/bin/appearance watch
+Restart=always
+RestartSec=30
+Environment=APPEARANCE_LATITUDE=__APPEARANCE_LATITUDE__
+Environment=APPEARANCE_LONGITUDE=__APPEARANCE_LONGITUDE__
+Environment=APPEARANCE_DARK_OFFSET_MINUTES=__APPEARANCE_DARK_OFFSET_MINUTES__
+Environment=APPEARANCE_DST_DARK_OFFSET_MINUTES=__APPEARANCE_DST_DARK_OFFSET_MINUTES__
+
+[Install]
+WantedBy=default.target

@@ -2,7 +2,7 @@
 # that drives format/lint/test/install has something to call; this is a
 # configuration repo, so they are intentionally light and never rewrite files.
 
-.PHONY: format lint test install
+.PHONY: format lint test install install-runtime
 
 format:
 	@echo "no formatter configured"
@@ -15,3 +15,6 @@ test:
 
 install:
 	@./install.sh
+
+install-runtime:
+	@./setup/install-runtime.sh
