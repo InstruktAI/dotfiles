@@ -9,7 +9,7 @@
 # Machine-specific configs (synced via Syncthing, not git)
 *.local.zsh
 *.local.sh
-macos/Brewfile.local
+homebrew/Brewfile.local
 .env
 
 # History/backup files and folders
@@ -24,9 +24,9 @@ macos/Brewfile.local
 __pycache__/
 
 # Appearance runtime logs and sync-conflict copies
-terminal/agent_state.json
-terminal/bin/*.log
-terminal/bin/*.log.*
-terminal/bin/*.sync-conflict-*
+appearance/agent_state.json
+appearance/bin/*.log
+appearance/bin/*.log.*
+appearance/bin/*.sync-conflict-*
 
 .teleclaude/

@@ -60,17 +60,17 @@ render_template() {
 
     sed \
         -e "s|__HOME__|$HOME|g" \
-        -e "s|__APPEARANCE_WATCHER__|$DOTFILES/terminal/bin/appearance-watcher|g" \
+        -e "s|__APPEARANCE_WATCHER__|$DOTFILES/appearance/bin/appearance-watcher|g" \
         -e "s|__APPEARANCE_LATITUDE__|$(env_value APPEARANCE_LATITUDE 52.37)|g" \
         -e "s|__APPEARANCE_LONGITUDE__|$(env_value APPEARANCE_LONGITUDE 4.89)|g" \
         -e "s|__APPEARANCE_DARK_OFFSET_MINUTES__|$(env_value APPEARANCE_DARK_OFFSET_MINUTES 0)|g" \
         -e "s|__APPEARANCE_DST_DARK_OFFSET_MINUTES__|$(env_value APPEARANCE_DST_DARK_OFFSET_MINUTES 0)|g" \
-        -e "s|__BREW_AUTOUPDATE_ITERM__|$DOTFILES/macos/bin/brew-autoupdate-iterm|g" \
+        -e "s|__BREW_AUTOUPDATE_ITERM__|$DOTFILES/homebrew/bin/brew-autoupdate-iterm|g" \
         "$src" > "$dst"
 }
 
 if [[ "$OS" == "Darwin" ]]; then
-    watcher_bin="$DOTFILES/terminal/bin/appearance-watcher"
+    watcher_bin="$DOTFILES/appearance/bin/appearance-watcher"
     # The compiled binary is committed to git and synced across machines, so it
     # works out of the box with no per-machine build. Only build when it is
     # actually missing; never overwrite the committed binary, so its code hash
@@ -80,7 +80,7 @@ if [[ "$OS" == "Darwin" ]]; then
     if [[ -f "$watcher_bin" ]]; then
         echo "  [OK] appearance-watcher present (from git)"
     elif command -v swiftc >/dev/null 2>&1; then
-        swiftc "$DOTFILES/terminal/bin/appearance-watcher.swift" -o "$watcher_bin"
+        swiftc "$DOTFILES/appearance/bin/appearance-watcher.swift" -o "$watcher_bin"
         echo "  [BUILD] appearance-watcher"
     else
         echo "  [WARN] no appearance-watcher binary and swiftc not found; skipping"
@@ -92,14 +92,14 @@ if [[ "$OS" == "Darwin" ]]; then
     # binary — two Full Disk Access entries for one program. Drop the stale link.
     rm -f "$HOME/.local/bin/appearance-watcher"
 
-    chmod +x "$DOTFILES/macos/bin/brew-autoupdate" "$DOTFILES/macos/bin/brew-autoupdate-iterm"
+    chmod +x "$DOTFILES/homebrew/bin/brew-autoupdate" "$DOTFILES/homebrew/bin/brew-autoupdate-iterm"
 
     mkdir -p "$HOME/Library/LaunchAgents"
 
     for plist_dir_and_name in \
-        "terminal:ai.instrukt.appearance-watcher.plist" \
-        "terminal:ai.instrukt.appearance-system.plist" \
-        "macos:ai.instrukt.brew-autoupdate.plist" \
+        "appearance:ai.instrukt.appearance-watcher.plist" \
+        "appearance:ai.instrukt.appearance-system.plist" \
+        "homebrew:ai.instrukt.brew-autoupdate.plist" \
     ; do
         plist_dir="${plist_dir_and_name%%:*}"
         plist_name="${plist_dir_and_name##*:}"
@@ -132,7 +132,7 @@ if [[ "$OS" == "Darwin" ]]; then
         echo "  [WARN] appearance-watcher not running"
     fi
 else
-    service_src="$DOTFILES/terminal/systemd/appearance.service"
+    service_src="$DOTFILES/appearance/systemd/appearance.service"
     service_dir="$HOME/.config/systemd/user"
     service_dst="$service_dir/appearance.service"
     mkdir -p "$service_dir"

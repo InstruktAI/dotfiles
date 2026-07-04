@@ -25,7 +25,7 @@ pre-existing files, reuses correct symlinks, and skips work already done.
 3. Runs `setup/install-core.sh` to create symlinks, wire `~/.zshrc`, and provision the
    appearance log directory. The appearance daemon/service tier is installed
    separately with `make install-runtime`.
-4. Checks/installs Homebrew packages from `macos/Brewfile.local`.
+4. Checks/installs Homebrew packages from `homebrew/Brewfile.local`.
 5. Applies macOS defaults from `macos/defaults.local.sh`.
 
 GPG key import stays manual — run `setup/import-gpg-key.sh` when needed.
@@ -37,10 +37,11 @@ GPG key import stays manual — run `setup/import-gpg-key.sh` when needed.
 | `install.sh` | Public entrypoint; forwards to `setup/bootstrap.sh`. |
 | `setup/` | Bootstrap and core install scripts, plus GPG key import/export. |
 | `zsh/` | Modular zsh configuration, loaded in numeric order. |
-| `terminal/` | Cross-platform dark/light appearance management and `tmux.conf`. |
-| `macos/` | Homebrew `Brewfile` and `defaults.sh` system preferences. |
+| `appearance/` | Cross-platform dark/light appearance management. |
+| `tmux/` | `tmux.conf`, symlinked to `~/.tmux.conf`. |
 | `iterm2/` | iTerm2 preferences loaded from this custom folder on macOS. |
-| `dist/` | Build output staging directory. |
+| `homebrew/` | `Brewfile` and the daily `brew-autoupdate` automation. |
+| `macos/` | macOS system preference defaults (`defaults.sh`). |
 | `.env` | Machine-local environment values (git-ignored) used at install time. |
 
 ### Local Overrides
@@ -50,7 +51,8 @@ git-ignored override files alongside their tracked `*.example.*` templates. The
 installer copies each example into its real path on first run. Examples:
 
 - `zsh/30-aliases.local.zsh`, `zsh/init.local.zsh` — extra shell config sourced by the base files.
-- `macos/defaults.local.sh`, `macos/Brewfile.local` — your machine's defaults and packages.
+- `macos/defaults.local.sh` — your machine's system preference defaults.
+- `homebrew/Brewfile.local` — your machine's package list.
 - `.env` — appearance coordinates and offsets read by the installer.
 
 ## `setup/`
@@ -99,7 +101,10 @@ numbered `.zsh` files in order; the numeric prefix encodes dependency order
 
 ## `macos/`
 
-- `Brewfile` — tracked baseline package list; copied to `Brewfile.local` for the machine.
+macOS system preference defaults — nothing else lives here. This is the one directory
+named after the OS rather than a tool, because its content genuinely *is* the
+operating system's own settings (`defaults write`), with no third-party tool involved.
+
 - `defaults.sh` — system preference defaults; copied to `defaults.local.sh` and applied during bootstrap.
 
 ## `iterm2/`
@@ -108,12 +113,33 @@ numbered `.zsh` files in order; the numeric prefix encodes dependency order
 macOS, `install-core.sh` points iTerm2 at this directory and enables loading prefs
 from it.
 
+## `tmux/`
+
+`tmux.conf` — symlinked to `~/.tmux.conf` by `make install`. Plain tmux configuration
+(keybindings, panes, mouse); it carries no appearance logic itself. `appearance reload`
+sets the `@appearance_mode` tmux user option from outside this file.
+
+## `homebrew/`
+
+The Homebrew tool: the package list and its automation.
+
+- `Brewfile` — tracked baseline package list; copied to `Brewfile.local` for the machine.
+- `Brewfile.local` — your machine's package list (git-ignored).
+- `bin/brew-autoupdate` — daily `brew update && brew upgrade --formula && brew upgrade --cask --greedy && brew cleanup`.
+- `bin/brew-autoupdate-iterm` — launchd's entry point. Runs `brew-autoupdate` inside a
+  minimized iTerm2 window instead of directly, so the macOS "App Management" TCC
+  permission needed for cask upgrades scopes to iTerm2 (grant it once in System
+  Settings → Privacy & Security → App Management) instead of to the bare shell
+  interpreter, which would otherwise apply to every script on the machine.
+- `launchd/ai.instrukt.brew-autoupdate.plist` — daily launchd agent, installed by
+  `make install-runtime`.
+
 ---
 
-## `terminal/` — Appearance Management
+## `appearance/` — Appearance Management
 
-Cross-platform terminal/tmux appearance management with automatic dark/light mode
-switching.
+Cross-platform dark/light appearance management, synced across the terminal, tmux,
+and CLI agent themes.
 
 ### Features
 
@@ -130,7 +156,7 @@ switching.
 Two tiers, both idempotent:
 
 - **`make install`** symlinks `bin/appearance.py` to `~/.local/bin/appearance`, symlinks
-  `tmux.conf` to `~/.tmux.conf`, and provisions the appearance log directory.
+  `tmux/tmux.conf` to `~/.tmux.conf`, and provisions the appearance log directory.
 - **`make install-runtime`** installs the service tier: on macOS it compiles the Swift
   watcher and loads the launchd jobs (Appearance-change watcher + solar `apply-system`);
   on Linux it enables a systemd `--user` service running `appearance watch`.
@@ -231,7 +257,7 @@ The synced settings locations are declared in the `AGENTS` table in
 | Codex | `~/.codex/config.toml` | `[tui].theme` |
 
 Preference memory and last-applied provenance live in the local, git-ignored
-`terminal/agent_state.json`, which is created on first reload when absent.
+`appearance/agent_state.json`, which is created on first reload when absent.
 
 This contract applies to every synced agent. For each agent, mode-only fields that
 accept only `dark` or `light` write the current mode directly and do not learn
@@ -271,7 +297,7 @@ set, the file is `$INSTRUKT_AI_LOG_ROOT/appearance/appearance.log`.
 ### Files
 
 ```
-terminal/
+appearance/
 ├── bin/
 │   ├── appearance.py            # Main script (uv/python); symlinked to ~/.local/bin/appearance
 │   └── appearance-watcher.swift # macOS watcher (Swift)
@@ -280,8 +306,7 @@ terminal/
 │   └── ai.instrukt.appearance-watcher.plist
 ├── systemd/
 │   └── appearance.service       # Linux service tier (systemd --user)
-├── agent_state.json             # Local ignored preference memory/provenance
-└── tmux.conf                    # Shared tmux configuration
+└── agent_state.json             # Local ignored preference memory/provenance
 ```
 
 ### Architecture

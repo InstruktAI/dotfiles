@@ -96,7 +96,7 @@ pin_node_formula() {
 }
 
 run_brew_bundle() {
-    local brewfile="$DOTFILES/macos/Brewfile.local"
+    local brewfile="$DOTFILES/homebrew/Brewfile.local"
 
     if [[ "$SKIP_APPS" == true || "$OS" != "Darwin" || ! -f "$brewfile" ]]; then
         return
@@ -128,7 +128,7 @@ run_brew_bundle() {
 }
 
 diff_brew_bundle() {
-    local brewfile="$DOTFILES/macos/Brewfile.local"
+    local brewfile="$DOTFILES/homebrew/Brewfile.local"
 
     if [[ "$OS" != "Darwin" ]]; then
         echo "Homebrew diff is macOS-only."
@@ -295,7 +295,7 @@ fi
 
 echo ""
 echo "=== Local Config ==="
-ensure_local_file "$DOTFILES/macos/Brewfile" "$DOTFILES/macos/Brewfile.local"
+ensure_local_file "$DOTFILES/homebrew/Brewfile" "$DOTFILES/homebrew/Brewfile.local"
 
 while IFS= read -r example; do
     local_file="${example/.example/}"

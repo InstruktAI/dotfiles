@@ -10,7 +10,7 @@
 set -uo pipefail
 
 DOTFILES="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$DOTFILES/macos/bin/brew-autoupdate"
+SCRIPT="$DOTFILES/homebrew/bin/brew-autoupdate"
 LOG="/tmp/brew-autoupdate.log"
 
 /usr/bin/osascript <<EOF

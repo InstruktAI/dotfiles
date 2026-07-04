@@ -121,11 +121,11 @@ link "$DOTFILES/zsh/zshenv" "$HOME/.zshenv"
 install_zsh_activation
 
 echo ""
-echo "=== Terminal ==="
+echo "=== Appearance ==="
 mkdir -p "$HOME/.local/bin"
 
-link "$DOTFILES/terminal/bin/appearance.py" "$HOME/.local/bin/appearance"
-link "$DOTFILES/terminal/tmux.conf" "$HOME/.tmux.conf"
+link "$DOTFILES/appearance/bin/appearance.py" "$HOME/.local/bin/appearance"
+link "$DOTFILES/tmux/tmux.conf" "$HOME/.tmux.conf"
 
 # appearance logs through the shared InstruktAI logger, which writes under the
 # canonical /var/log/instrukt-ai/<app> root.

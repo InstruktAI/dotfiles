@@ -5,4 +5,4 @@
 // "machine-specific configs" section of .gitignore.
 *.local.sh
 *.local.zsh
-macos/Brewfile.local
+homebrew/Brewfile.local
