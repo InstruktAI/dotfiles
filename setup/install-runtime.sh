@@ -65,6 +65,7 @@ render_template() {
         -e "s|__APPEARANCE_LONGITUDE__|$(env_value APPEARANCE_LONGITUDE 4.89)|g" \
         -e "s|__APPEARANCE_DARK_OFFSET_MINUTES__|$(env_value APPEARANCE_DARK_OFFSET_MINUTES 0)|g" \
         -e "s|__APPEARANCE_DST_DARK_OFFSET_MINUTES__|$(env_value APPEARANCE_DST_DARK_OFFSET_MINUTES 0)|g" \
+        -e "s|__BREW_AUTOUPDATE_ITERM__|$DOTFILES/macos/bin/brew-autoupdate-iterm|g" \
         "$src" > "$dst"
 }
 
@@ -91,10 +92,16 @@ if [[ "$OS" == "Darwin" ]]; then
     # binary — two Full Disk Access entries for one program. Drop the stale link.
     rm -f "$HOME/.local/bin/appearance-watcher"
 
+    chmod +x "$DOTFILES/macos/bin/brew-autoupdate" "$DOTFILES/macos/bin/brew-autoupdate-iterm"
+
     mkdir -p "$HOME/Library/LaunchAgents"
 
-    for plist_name in ai.instrukt.appearance-watcher.plist ai.instrukt.appearance-system.plist; do
-        plist_src="$DOTFILES/terminal/launchd/$plist_name"
+    for plist_name in ai.instrukt.appearance-watcher.plist ai.instrukt.appearance-system.plist ai.instrukt.brew-autoupdate.plist; do
+        if [[ -f "$DOTFILES/terminal/launchd/$plist_name" ]]; then
+            plist_src="$DOTFILES/terminal/launchd/$plist_name"
+        else
+            plist_src="$DOTFILES/macos/launchd/$plist_name"
+        fi
         plist_dst="$HOME/Library/LaunchAgents/$plist_name"
         plist_label="${plist_name%.plist}"
 
