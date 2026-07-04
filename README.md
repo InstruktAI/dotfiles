@@ -25,7 +25,8 @@ pre-existing files, reuses correct symlinks, and skips work already done.
 3. Runs `setup/install-core.sh` to create symlinks, wire `~/.zshrc`, and provision the
    appearance log directory. The appearance daemon/service tier is installed
    separately with `make install-runtime`.
-4. Checks/installs Homebrew packages from `homebrew/Brewfile.local`.
+4. Checks/installs Homebrew packages from `homebrew/Brewfile.common.local` (every OS)
+   and `homebrew/Brewfile.macos.local` (Darwin only).
 5. Applies macOS defaults from `macos/defaults.local.sh`.
 
 GPG key import stays manual — run `setup/import-gpg-key.sh` when needed.
@@ -40,7 +41,7 @@ GPG key import stays manual — run `setup/import-gpg-key.sh` when needed.
 | `appearance/` | Cross-platform dark/light appearance management. |
 | `tmux/` | `tmux.conf`, symlinked to `~/.tmux.conf`. |
 | `iterm2/` | iTerm2 preferences loaded from this custom folder on macOS. |
-| `homebrew/` | `Brewfile` and the daily `brew-autoupdate` automation. |
+| `homebrew/` | `Brewfile.common`/`Brewfile.macos` and the daily `brew-autoupdate` automation. |
 | `macos/` | macOS system preference defaults (`defaults.sh`). |
 | `.env` | Machine-local environment values (git-ignored) used at install time. |
 
@@ -52,7 +53,7 @@ installer copies each example into its real path on first run. Examples:
 
 - `zsh/30-aliases.local.zsh`, `zsh/init.local.zsh` — extra shell config sourced by the base files.
 - `macos/defaults.local.sh` — your machine's system preference defaults.
-- `homebrew/Brewfile.local` — your machine's package list.
+- `homebrew/Brewfile.common.local`, `homebrew/Brewfile.macos.local` — your machine's package list.
 - `.env` — appearance coordinates and offsets read by the installer.
 
 ## `setup/`
@@ -123,8 +124,11 @@ sets the `@appearance_mode` tmux user option from outside this file.
 
 The Homebrew tool: the package list and its automation.
 
-- `Brewfile` — tracked baseline package list; copied to `Brewfile.local` for the machine.
-- `Brewfile.local` — your machine's package list (git-ignored).
+- `Brewfile.common` — tracked baseline package list applied on every OS Homebrew supports;
+  copied to `Brewfile.common.local` for the machine (git-ignored).
+- `Brewfile.macos` — casks, GNU-userland overrides (macOS ships BSD tools; Linux already
+  has GNU natively), and Dock/Keychain integrations that don't apply on Linux; copied to
+  `Brewfile.macos.local`, applied only when `$OS == Darwin`.
 - `bin/brew-autoupdate` — daily `brew update && brew upgrade --formula && brew upgrade --cask --greedy && brew cleanup`.
 - `bin/brew-autoupdate-iterm` — launchd's entry point. Runs `brew-autoupdate` inside a
   minimized iTerm2 window instead of directly, so the macOS "App Management" TCC

@@ -9,7 +9,8 @@
 # Machine-specific configs (synced via Syncthing, not git)
 *.local.zsh
 *.local.sh
-homebrew/Brewfile.local
+homebrew/Brewfile.common.local
+homebrew/Brewfile.macos.local
 .env
 
 # History/backup files and folders

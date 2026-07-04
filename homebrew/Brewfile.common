@@ -1,22 +1,17 @@
-# Dotfiles Brewfile - curated core tools.
+# Dotfiles Brewfile - cross-platform baseline (macOS + Linux via Homebrew).
 # This file is the upstream template. The installer copies it to
-# Brewfile.local once and only checks/installs from that local copy.
+# Brewfile.common.local once and only checks/installs from that local copy.
+# macOS-only tools (casks, GUI/Dock integrations) live in Brewfile.macos.
 
 tap "homebrew/bundle"
 tap "homebrew/services"
 
 # --- Shell & Terminal ---
 brew "bash-completion@2"
-brew "coreutils"
-brew "findutils"
-brew "gnu-sed"
-brew "gnu-tar"
-brew "grep"
 brew "make"
 brew "moreutils"
 brew "vim"
 brew "tmux"
-brew "reattach-to-user-namespace"
 
 # --- Dev Tools ---
 brew "git"
@@ -60,18 +55,6 @@ brew "yt-dlp"
 # --- Security & Encryption ---
 brew "age"
 brew "sops"
-brew "pinentry-mac"
 
 # --- System ---
-brew "dockutil"
 brew "syncthing"
-brew "mackup"
-
-# --- Casks ---
-cask "docker-desktop"
-cask "handy"
-cask "iterm2"
-cask "ngrok"
-cask "raycast"
-cask "visual-studio-code"
-cask "vlc"

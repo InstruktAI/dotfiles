@@ -95,82 +95,104 @@ pin_node_formula() {
     brew link --overwrite --force node@24
 }
 
-run_brew_bundle() {
-    local brewfile="$DOTFILES/homebrew/Brewfile.local"
+# Brewfile.common applies on every OS; Brewfile.macos (casks, GNU-userland
+# overrides, Dock/Keychain integration) only makes sense on Darwin.
+brew_bundle_files() {
+    echo "$DOTFILES/homebrew/Brewfile.common.local"
+    if [[ "$OS" == "Darwin" ]]; then
+        echo "$DOTFILES/homebrew/Brewfile.macos.local"
+    fi
+}
 
-    if [[ "$SKIP_APPS" == true || "$OS" != "Darwin" || ! -f "$brewfile" ]]; then
+run_brew_bundle() {
+    if [[ "$SKIP_APPS" == true ]]; then
         return
     fi
 
     echo ""
     echo "=== Homebrew Packages ==="
 
-    if brew bundle check --file="$brewfile"; then
-        echo "  [OK] Brewfile.local is satisfied"
-        pin_node_formula
-        return
-    fi
+    local brewfile any_file=false
+    while IFS= read -r brewfile; do
+        [[ -f "$brewfile" ]] || continue
+        any_file=true
+        local name
+        name="$(basename "$brewfile")"
 
-    echo "  Installing missing Brewfile.local entries (no upgrades)..."
-    # --adopt lets brew take over apps already installed by hand (iTerm2,
-    # VS Code, ...) when they match the cask, instead of erroring on the
-    # existing artifact. A leftover mismatch (app at a different version, a
-    # flaky cask) must not abort the whole bootstrap, so the run is non-fatal
-    # and reported.
-    if ! HOMEBREW_BUNDLE_NO_UPGRADE=1 \
-        HOMEBREW_NO_INSTALL_UPGRADE=1 \
-        HOMEBREW_CASK_OPTS="--adopt" \
-        brew bundle install --file="$brewfile" --no-lock --no-upgrade; then
-        echo "  [WARN] Some entries did not install (e.g. an app already present"
-        echo "         at a different version). Continuing."
+        if brew bundle check --file="$brewfile"; then
+            echo "  [OK] $name is satisfied"
+            continue
+        fi
+
+        echo "  Installing missing $name entries (no upgrades)..."
+        # --adopt lets brew take over apps already installed by hand (iTerm2,
+        # VS Code, ...) when they match the cask, instead of erroring on the
+        # existing artifact. A leftover mismatch (app at a different version, a
+        # flaky cask) must not abort the whole bootstrap, so the run is non-fatal
+        # and reported.
+        if ! HOMEBREW_BUNDLE_NO_UPGRADE=1 \
+            HOMEBREW_NO_INSTALL_UPGRADE=1 \
+            HOMEBREW_CASK_OPTS="--adopt" \
+            brew bundle install --file="$brewfile" --no-lock --no-upgrade; then
+            echo "  [WARN] Some entries did not install (e.g. an app already present"
+            echo "         at a different version). Continuing."
+        fi
+    done < <(brew_bundle_files)
+
+    if [[ "$any_file" == false ]]; then
+        return
     fi
     pin_node_formula
 }
 
 diff_brew_bundle() {
-    local brewfile="$DOTFILES/homebrew/Brewfile.local"
-
-    if [[ "$OS" != "Darwin" ]]; then
-        echo "Homebrew diff is macOS-only."
-        return
-    fi
     if ! command -v brew &>/dev/null; then
         echo "Homebrew is not installed."
         return
     fi
-    if [[ ! -f "$brewfile" ]]; then
-        echo "No Brewfile.local at $brewfile"
+
+    echo "=== Homebrew: what ./install.sh will install ==="
+
+    local brewfile found=false
+    while IFS= read -r brewfile; do
+        [[ -f "$brewfile" ]] || continue
+        found=true
+        echo ""
+        echo "--- $(basename "$brewfile") ---"
+
+        # What a --no-upgrade install would actually add: Brewfile entries that
+        # are not installed at all. Outdated or unlinked packages are left
+        # untouched by the install, so they are excluded here (unlike `brew
+        # bundle check`).
+        local missing_casks missing_formulae
+        missing_casks="$(comm -23 \
+            <(brew bundle list --casks --file="$brewfile" 2>/dev/null | sort -u) \
+            <(brew list --cask -1 2>/dev/null | sort -u))"
+        missing_formulae="$(comm -23 \
+            <(brew bundle list --formulae --file="$brewfile" 2>/dev/null | sort -u) \
+            <(brew list --formula -1 2>/dev/null | sort -u))"
+
+        if [[ -z "$missing_casks$missing_formulae" ]]; then
+            echo "Nothing - every entry is already installed."
+        else
+            if [[ -n "$missing_casks" ]]; then
+                echo "Casks:"
+                printf '%s\n' "$missing_casks" | sed 's/^/  /'
+            fi
+            if [[ -n "$missing_formulae" ]]; then
+                echo "Formulae:"
+                printf '%s\n' "$missing_formulae" | sed 's/^/  /'
+            fi
+        fi
+    done < <(brew_bundle_files)
+
+    if [[ "$found" == false ]]; then
+        echo "No local Brewfiles found. Run ./install.sh once to seed them."
         return
     fi
 
-    # What a --no-upgrade install would actually add: Brewfile entries that are
-    # not installed at all. Outdated or unlinked packages are left untouched by
-    # the install, so they are excluded here (unlike `brew bundle check`).
-    local missing_casks missing_formulae
-    missing_casks="$(comm -23 \
-        <(brew bundle list --casks --file="$brewfile" 2>/dev/null | sort -u) \
-        <(brew list --cask -1 2>/dev/null | sort -u))"
-    missing_formulae="$(comm -23 \
-        <(brew bundle list --formulae --file="$brewfile" 2>/dev/null | sort -u) \
-        <(brew list --formula -1 2>/dev/null | sort -u))"
-
-    echo "=== Homebrew: what ./install.sh will install ==="
     echo ""
-    if [[ -z "$missing_casks$missing_formulae" ]]; then
-        echo "Nothing - every Brewfile.local entry is already installed."
-    else
-        if [[ -n "$missing_casks" ]]; then
-            echo "Casks:"
-            printf '%s\n' "$missing_casks" | sed 's/^/  /'
-        fi
-        if [[ -n "$missing_formulae" ]]; then
-            echo "Formulae:"
-            printf '%s\n' "$missing_formulae" | sed 's/^/  /'
-        fi
-    fi
-
-    echo ""
-    echo "Remove anything you don't want from: $brewfile"
+    echo "Remove anything you don't want from: $DOTFILES/homebrew/*.local"
 }
 
 _is_breaking() {
@@ -295,7 +317,10 @@ fi
 
 echo ""
 echo "=== Local Config ==="
-ensure_local_file "$DOTFILES/homebrew/Brewfile" "$DOTFILES/homebrew/Brewfile.local"
+ensure_local_file "$DOTFILES/homebrew/Brewfile.common" "$DOTFILES/homebrew/Brewfile.common.local"
+if [[ "$OS" == "Darwin" ]]; then
+    ensure_local_file "$DOTFILES/homebrew/Brewfile.macos" "$DOTFILES/homebrew/Brewfile.macos.local"
+fi
 
 while IFS= read -r example; do
     local_file="${example/.example/}"

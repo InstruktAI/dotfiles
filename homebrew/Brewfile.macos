@@ -1,0 +1,30 @@
+# Dotfiles Brewfile - macOS-only tools: GNU userland overrides, GUI apps, and
+# OS-integration formulae that don't build or don't make sense on Linux.
+# This file is the upstream template. The installer copies it to
+# Brewfile.macos.local once and only checks/installs from that local copy.
+
+# --- GNU userland (macOS ships BSD variants; Linux already has these natively) ---
+brew "coreutils"
+brew "findutils"
+brew "gnu-sed"
+brew "gnu-tar"
+brew "grep"
+
+# --- Shell & Terminal (macOS-specific integration) ---
+brew "reattach-to-user-namespace"
+
+# --- Security & Encryption (macOS Keychain integration) ---
+brew "pinentry-mac"
+
+# --- System (macOS Dock / app-preference sync) ---
+brew "dockutil"
+brew "mackup"
+
+# --- Casks ---
+cask "docker-desktop"
+cask "handy"
+cask "iterm2"
+cask "ngrok"
+cask "raycast"
+cask "visual-studio-code"
+cask "vlc"
