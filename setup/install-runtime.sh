@@ -96,12 +96,14 @@ if [[ "$OS" == "Darwin" ]]; then
 
     mkdir -p "$HOME/Library/LaunchAgents"
 
-    for plist_name in ai.instrukt.appearance-watcher.plist ai.instrukt.appearance-system.plist ai.instrukt.brew-autoupdate.plist; do
-        if [[ -f "$DOTFILES/terminal/launchd/$plist_name" ]]; then
-            plist_src="$DOTFILES/terminal/launchd/$plist_name"
-        else
-            plist_src="$DOTFILES/macos/launchd/$plist_name"
-        fi
+    for plist_dir_and_name in \
+        "terminal:ai.instrukt.appearance-watcher.plist" \
+        "terminal:ai.instrukt.appearance-system.plist" \
+        "macos:ai.instrukt.brew-autoupdate.plist" \
+    ; do
+        plist_dir="${plist_dir_and_name%%:*}"
+        plist_name="${plist_dir_and_name##*:}"
+        plist_src="$DOTFILES/$plist_dir/launchd/$plist_name"
         plist_dst="$HOME/Library/LaunchAgents/$plist_name"
         plist_label="${plist_name%.plist}"
 
