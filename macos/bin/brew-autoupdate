@@ -1,0 +1,38 @@
+#!/bin/bash
+# Daily Homebrew maintenance: refresh taps, upgrade formulae, then upgrade
+# casks. Cask upgrades replace app bundles in /Applications, which macOS
+# gates behind the "App Management" privacy permission — see
+# brew-autoupdate-iterm for why this script is never invoked directly by
+# launchd.
+
+set -uo pipefail
+
+status=0
+
+date
+
+if ! brew update; then
+    status=1
+fi
+
+if ! brew upgrade --formula -v; then
+    echo "brew-autoupdate: formula upgrade failed; continuing to casks" >&2
+    status=1
+fi
+
+if ! brew upgrade --cask -v --greedy; then
+    status=1
+fi
+
+if ! brew cleanup; then
+    status=1
+fi
+
+if [[ "$status" -eq 0 ]]; then
+    message="Homebrew is up to date."
+else
+    message="Homebrew autoupdate finished with errors — check the log."
+fi
+osascript -e "display notification \"$message\" with title \"Homebrew Autoupdate\"" >/dev/null 2>&1 || true
+
+exit "$status"

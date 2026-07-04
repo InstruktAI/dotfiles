@@ -1,0 +1,24 @@
+#!/bin/bash
+# launchd invokes this instead of brew-autoupdate directly. A script run bare
+# by launchd resolves to /bin/sh (or bash) as the TCC "responsible process",
+# so granting the "App Management" permission it needs for cask upgrades would
+# apply to every shell script on the machine. Running it inside an iTerm2
+# window instead scopes that grant to iTerm2, an app already trusted for daily
+# interactive use. The window is minimized immediately so the daily run stays
+# out of the way.
+
+set -uo pipefail
+
+DOTFILES="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT="$DOTFILES/macos/bin/brew-autoupdate"
+LOG="/tmp/brew-autoupdate.log"
+
+/usr/bin/osascript <<EOF
+tell application "iTerm2"
+    set newWindow to (create window with default profile)
+    set miniaturized of newWindow to true
+    tell current session of newWindow
+        write text "\"$SCRIPT\" > \"$LOG\" 2>&1; exit"
+    end tell
+end tell
+EOF
