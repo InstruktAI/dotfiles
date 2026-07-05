@@ -1,4 +1,2 @@
-business:
-  domains:
-    software-development: docs
+business: {}
 project_slug: dotfiles
