@@ -29,9 +29,6 @@ if [[ -d "/opt/homebrew/bin" ]]; then
     prepend_path "/opt/homebrew/bin"
     prepend_path "/opt/homebrew/sbin"
 fi
-if [[ -d "/opt/homebrew/opt/node@24/bin" ]]; then
-    prepend_path "/opt/homebrew/opt/node@24/bin"
-fi
 
 if [[ -d "/home/linuxbrew/.linuxbrew/bin" ]]; then
     prepend_path "/home/linuxbrew/.linuxbrew/bin"

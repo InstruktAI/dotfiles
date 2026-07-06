@@ -41,9 +41,9 @@ brew "watch"
 brew "go"
 # node stays on the v24 line — native modules (better-sqlite3, …) break on newer majors.
 # bootstrap.sh pins any unversioned node so the autoupdate agent can't relink it.
+# pnpm comes from node's bundled corepack (`corepack enable`) — no separate formula.
 brew "node@24", link: true
 brew "uv"
-brew "pnpm"
 brew "pipx"
 
 # --- Media & Documents ---
