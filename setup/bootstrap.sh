@@ -79,12 +79,15 @@ pin_node_formula() {
 
     # Keep `node` on the v24 line. Some formulae depend on unversioned `node`;
     # pinning keeps the autoupdate agent from relinking past v24. Skip entirely
-    # when node@24 is already the active node, so re-runs do not relink.
+    # when node@24 is already actually linked, so re-runs do not relink.
     if ! brew list --formula node@24 &>/dev/null; then
         return
     fi
 
-    if [[ "$(node --version 2>/dev/null)" == v24.* ]]; then
+    # Check the real Homebrew link target, not `node --version` — a PATH entry
+    # elsewhere (manual override, nvm, etc.) can satisfy a version check without
+    # Homebrew ever having linked node@24, silently masking a failed link below.
+    if [[ "$(readlink "$(brew --prefix)/bin/node" 2>/dev/null)" == *"/node@24/"* ]]; then
         return
     fi
 
@@ -92,7 +95,10 @@ pin_node_formula() {
         brew pin node 2>/dev/null || true
         brew unlink node &>/dev/null || true
     fi
-    brew link --overwrite --force node@24
+    if ! brew link --overwrite --force node@24; then
+        echo "pin_node_formula: failed to link node@24" >&2
+        return 1
+    fi
 }
 
 # Brewfile.common applies on every OS; Brewfile.macos (casks, GNU-userland
