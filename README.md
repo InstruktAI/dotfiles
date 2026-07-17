@@ -291,12 +291,12 @@ appearance watch            # Linux run loop: poll every 5m, reload on change
 | `APPEARANCE_DST_DARK_OFFSET_MINUTES` | 0 | Extra dark offset while local DST is active |
 | `APPEARANCE_CACHE_DIR` | `/tmp` | Directory for date/location-keyed sunrise/sunset cache files |
 | `APPEARANCE_LOG_LEVEL` | INFO | Logger level: DEBUG/INFO/WARNING/ERROR |
-| `INSTRUKT_AI_LOG_ROOT` | `/var/log/instrukt-ai` | Override root for InstruktAI logs |
+| `XDG_STATE_HOME` | `~/.local/state` | Override state root for InstruktAI logs |
 
 Runtime logs are written through `instrukt_ai_logging` and read with
-`instrukt-ai-logs appearance`. The default log file is
-`/var/log/instrukt-ai/appearance/appearance.log`; when `INSTRUKT_AI_LOG_ROOT` is
-set, the file is `$INSTRUKT_AI_LOG_ROOT/appearance/appearance.log`.
+`instrukt-ai-logs appearance`. The log file is
+`$XDG_STATE_HOME/instrukt-ai/appearance/appearance.log` (default
+`~/.local/state/instrukt-ai/appearance/appearance.log`).
 
 ### Files
 

@@ -65,4 +65,4 @@ The same variables apply on both platforms and are injected into the launchd pli
 *   `APPEARANCE_LATITUDE` / `APPEARANCE_LONGITUDE`: Coordinates for the solar computation.
 *   `APPEARANCE_DARK_OFFSET_MINUTES`: Start dark mode this many minutes before sunset (default 0).
 *   `APPEARANCE_DST_DARK_OFFSET_MINUTES`: Extra dark offset while local DST is active (default 0).
-*   `APPEARANCE_LOG_LEVEL`: Logger level (DEBUG/INFO/WARNING/ERROR; default INFO). Logs land in `/var/log/instrukt-ai/appearance/appearance.log`.
+*   `APPEARANCE_LOG_LEVEL`: Logger level (DEBUG/INFO/WARNING/ERROR; default INFO). Logs land in `$XDG_STATE_HOME/instrukt-ai/appearance/appearance.log` (default `~/.local/state/instrukt-ai/appearance/appearance.log`).

@@ -127,15 +127,6 @@ mkdir -p "$HOME/.local/bin"
 link "$DOTFILES/appearance/bin/appearance.py" "$HOME/.local/bin/appearance"
 link "$DOTFILES/tmux/tmux.conf" "$HOME/.tmux.conf"
 
-# appearance logs through the shared InstruktAI logger, which writes under the
-# canonical /var/log/instrukt-ai/<app> root.
-if telec_bin="$(command -v telec)"; then
-    provision_logs="$(dirname "$(readlink "$telec_bin")")/provision-logs.sh"
-    if [[ -x "$provision_logs" ]]; then
-        "$provision_logs" appearance --non-interactive && echo "  [OK] appearance log dir provisioned"
-    fi
-fi
-
 if [[ "$OS" == "Darwin" ]]; then
     if [[ -d "$DOTFILES/iterm2" ]]; then
         iterm_folder="$(defaults read com.googlecode.iterm2 PrefsCustomFolder 2>/dev/null || true)"

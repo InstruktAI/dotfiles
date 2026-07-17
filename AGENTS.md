@@ -38,7 +38,6 @@ make install-runtime  # daemon tier: launchd (macOS) or systemd --user (Linux)
 1.  Symlinks the `zsh/` directory to `~/.config/zsh`.
 2.  Symlinks `appearance/bin/appearance.py` to `~/.local/bin/appearance` (requires `~/.local/bin` to be in the `PATH`).
 3.  Symlinks `tmux/tmux.conf` to `~/.tmux.conf`.
-4.  Provisions the appearance log directory under `/var/log/instrukt-ai`.
 
 **What `make install-runtime` does:** installs the appearance service tier — on macOS the launchd agents (the Swift watcher and the solar `apply-system` job); on Linux a systemd `--user` service running `appearance watch`.
 
