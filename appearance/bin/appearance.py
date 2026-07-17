@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#   "instruktai-python-logger",
+#   "instruktai-python-logger>=0.6.3",
 # ]
 # ///
 """Unified appearance management - OS agnostic.
