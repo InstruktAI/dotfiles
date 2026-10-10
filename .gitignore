@@ -31,3 +31,5 @@ appearance/bin/*.log.*
 appearance/bin/*.sync-conflict-*
 
 .teleclaude/
+teleclaude.yml
+teleclaude.yml.lock
