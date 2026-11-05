@@ -1,0 +1,8 @@
+#!/bin/bash
+# Reloads launchd agent {{ .label }} when its definition changes.
+# definition: {{ .hash }}
+set -euo pipefail
+plist="$HOME/Library/LaunchAgents/{{ .label }}.plist"
+launchctl unload "$plist" 2>/dev/null || true
+launchctl load "$plist"
+echo "[launchd] {{ .label }} loaded"

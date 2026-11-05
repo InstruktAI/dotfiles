@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>ai.instrukt.chezmoi-update</string>
+    <!-- Pull the dotfiles source from git and apply it. DOTFILES_UNATTENDED
+         makes the scripts that need a person (sudo, prompts) render empty, so
+         they wait for the next interactive chezmoi apply. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/env</string>
+        <string>chezmoi</string>
+        <string>update</string>
+        <string>--no-tty</string>
+        <string>--force</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>{{ .chezmoi.homeDir }}/.local/bin:{{ .chezmoi.homeDir }}/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>DOTFILES_UNATTENDED</key>
+        <string>1</string>
+    </dict>
+    <key>StartInterval</key>
+    <integer>{{ .update.interval_seconds }}</integer>
+    <key>StandardOutPath</key>
+    <string>/tmp/chezmoi-update.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/chezmoi-update.log</string>
+</dict>
+</plist>

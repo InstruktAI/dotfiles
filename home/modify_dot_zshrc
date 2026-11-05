@@ -1,0 +1,72 @@
+#!/bin/bash
+# chezmoi modify script for ~/.zshrc: the file stays the machine's own (Oh My
+# Zsh theme, plugins, lines tool installers append); chezmoi manages only the
+# block that sources ~/.config/zsh/init.zsh, placed after Oh My Zsh loads.
+# Reads the current file on stdin and writes the new contents to stdout.
+
+set -euo pipefail
+
+current="$(cat)"
+
+if [[ -z "$current" ]]; then
+    current='export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME="robbyrussell"
+plugins=(git)
+source $ZSH/oh-my-zsh.sh'
+fi
+
+printf '%s\n' "$current" | awk '
+    # A blank line is held back until the next line is known, so the blank
+    # that precedes the managed block is dropped together with the block.
+    # That keeps re-runs byte-identical.
+    function flush() {
+        if (held) {
+            print ""
+            held = 0
+        }
+    }
+    function emit_block() {
+        print ""
+        print "# >>> instrukt dotfiles >>>"
+        print "[[ -r \"$HOME/.config/zsh/init.zsh\" ]] && source \"$HOME/.config/zsh/init.zsh\""
+        print "# <<< instrukt dotfiles <<<"
+    }
+    /^# >>> instrukt dotfiles >>>$/ {
+        held = 0
+        in_block = 1
+        next
+    }
+    /^# <<< instrukt dotfiles <<<$/ {
+        in_block = 0
+        next
+    }
+    in_block {
+        next
+    }
+    # Legacy activation lines from earlier installers.
+    /^export ZDOTDIR="\$HOME\/\.config\/zsh"$/ ||
+    /\$ZDOTDIR\/00-helpers\.zsh/ ||
+    /Sync\/dotfiles\/zsh\/init\.zsh/ ||
+    /Workspace\/InstruktAI\/dotfiles\/zsh\/init\.zsh/ {
+        next
+    }
+    /^$/ {
+        flush()
+        held = 1
+        next
+    }
+    {
+        flush()
+        print
+    }
+    !inserted && /^source[[:space:]]+\$ZSH\/oh-my-zsh\.sh$/ {
+        emit_block()
+        inserted = 1
+    }
+    END {
+        flush()
+        if (!inserted) {
+            emit_block()
+        }
+    }
+'

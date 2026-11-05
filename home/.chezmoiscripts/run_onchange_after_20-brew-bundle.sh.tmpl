@@ -1,0 +1,10 @@
+{{- if not (includeTemplate "unattended-guard" .) -}}
+#!/bin/bash
+# Installs missing Brewfile entries whenever a Brewfile changes.
+# Brewfile.common: {{ include "dot_config/homebrew/Brewfile.common" | sha256sum }}
+{{- if eq .chezmoi.os "darwin" }}
+# Brewfile.macos: {{ include "dot_config/homebrew/Brewfile.macos" | sha256sum }}
+{{- end }}
+set -euo pipefail
+exec "$HOME/.local/bin/dotfiles-brew" install
+{{ end -}}

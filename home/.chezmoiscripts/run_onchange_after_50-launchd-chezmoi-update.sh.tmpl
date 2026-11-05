@@ -1,0 +1,5 @@
+{{- /* Reloading this agent from inside its own run would stop the update that
+       is reloading it, so the reload waits for an interactive apply. */ -}}
+{{- if and (eq .chezmoi.os "darwin") (not (includeTemplate "unattended-guard" .)) -}}
+{{ template "launchd-reload" dict "label" "ai.instrukt.chezmoi-update" "hash" (includeTemplate "Library/LaunchAgents/ai.instrukt.chezmoi-update.plist.tmpl" . | sha256sum) }}
+{{ end -}}

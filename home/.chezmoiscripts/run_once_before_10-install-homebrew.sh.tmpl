@@ -1,0 +1,12 @@
+{{- if not (includeTemplate "unattended-guard" .) -}}
+#!/bin/bash
+# Installs Homebrew when no brew is present.
+set -euo pipefail
+for brew in /opt/homebrew/bin/brew /usr/local/bin/brew /home/linuxbrew/.linuxbrew/bin/brew; do
+    if [[ -x "$brew" ]]; then
+        exit 0
+    fi
+done
+echo "Installing Homebrew..."
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+{{ end -}}

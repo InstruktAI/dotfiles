@@ -1,0 +1,11 @@
+{{- if not (includeTemplate "unattended-guard" .) -}}
+#!/bin/bash
+# Installs Bun when it is missing. Runs after ~/.zshrc is updated, so the lines
+# Bun's installer appends there are kept by modify_dot_zshrc on later applies.
+set -euo pipefail
+if command -v bun >/dev/null 2>&1 || [[ -x "$HOME/.bun/bin/bun" ]]; then
+    exit 0
+fi
+echo "Installing Bun..."
+curl -fsSL https://bun.sh/install | bash
+{{ end -}}

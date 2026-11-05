@@ -1,0 +1,35 @@
+# Target paths chezmoi leaves alone. Interpreted as a template.
+
+# Agent notes kept next to the source they describe; not dotfiles.
+**/AGENTS.md
+**/CLAUDE.md
+
+# Python bytecode from running scripts in the source tree.
+**/__pycache__
+**/__pycache__/**
+
+{{- if ne .chezmoi.os "darwin" }}
+# macOS-only targets.
+Library
+.local/libexec
+.local/bin/brew-autoupdate
+.local/bin/brew-autoupdate-iterm
+.config/homebrew/Brewfile.macos
+.config/beszel/beszel-agent.env
+{{- end }}
+
+{{- if ne .chezmoi.os "linux" }}
+# Linux-only targets.
+.config/systemd
+{{- end }}
+
+{{- if not (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt")) }}
+# Encrypted targets wait until this machine holds the age identity.
+.config/zsh/25-secrets.local.zsh
+.config/beszel/token
+{{- end }}
+
+{{- if not .beszel.key }}
+# No Beszel hub key configured for this machine: no agent configuration.
+.config/beszel
+{{- end }}

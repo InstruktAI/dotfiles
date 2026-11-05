@@ -1,0 +1,80 @@
+{{- /*
+  Installs and (re)starts the Beszel agent on machines whose chezmoi data sets
+  beszel.key, following https://www.beszel.dev/guide/agent-installation:
+  macOS through the henrygd/beszel Homebrew tap and `brew services` (its
+  environment is ~/.config/beszel/beszel-agent.env, rendered by chezmoi);
+  Linux through the official install script as a systemd service. The script
+  reruns whenever the agent's configuration or the encrypted token changes.
+*/ -}}
+{{- $tokenHash := "" -}}
+{{- if includeTemplate "beszel-token-deployed" . -}}
+{{-   range glob (joinPath .chezmoi.sourceDir "dot_config/beszel/*token*") -}}
+{{-     $tokenHash = include . | sha256sum -}}
+{{-   end -}}
+{{- end -}}
+{{- if .beszel.key -}}
+{{- if eq .chezmoi.os "darwin" -}}
+#!/bin/bash
+# environment: {{ includeTemplate "dot_config/beszel/private_beszel-agent.env.tmpl" . | sha256sum }}
+# token: {{ $tokenHash }}
+set -euo pipefail
+# chezmoi's environment may predate a Homebrew installed earlier in this apply.
+if ! command -v brew >/dev/null 2>&1; then
+    for candidate in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+        if [[ -x "$candidate" ]]; then
+            eval "$("$candidate" shellenv)"
+            break
+        fi
+    done
+fi
+mkdir -p "$HOME/.config/beszel" "$HOME/.cache/beszel"
+brew tap henrygd/beszel
+brew trust henrygd/beszel/beszel-agent
+if ! brew list --formula beszel-agent >/dev/null 2>&1; then
+    brew install beszel-agent
+fi
+brew services restart beszel-agent
+echo "[beszel] agent (re)started; logs: ~/.cache/beszel/beszel-agent.log"
+{{ else if and (eq .chezmoi.os "linux") (not (includeTemplate "unattended-guard" .)) -}}
+#!/bin/bash
+# The install script needs root (it creates the beszel user and a system
+# service), so this runs only from an interactive apply. It receives the key
+# and port; the hub URL and the token are reconciled in a drop-in this script
+# owns, so a cleared value is cleared and the token never appears on a
+# command line or in the world-readable unit file.
+# key: {{ .beszel.key | sha256sum }}
+# hub: {{ .beszel.hub_url | sha256sum }}
+# listen: {{ .beszel.listen }}
+# token: {{ $tokenHash }}
+set -euo pipefail
+installer="$(mktemp)"
+trap 'rm -f "$installer"' EXIT
+curl -sL https://get.beszel.dev -o "$installer"
+chmod +x "$installer"
+"$installer" -k {{ .beszel.key | quote }} -p {{ .beszel.listen | quote }} --auto-update true
+
+# A token passed to the installer earlier sits in plaintext in the unit, and a
+# non-empty TOKEN wins over TOKEN_FILE: blank it there (as the installer edits
+# that line itself) and in the drop-in, which systemd applies after the unit.
+sudo sed -i 's|^Environment="TOKEN=.*"|Environment="TOKEN="|' /etc/systemd/system/beszel-agent.service
+sudo install -d -m 0755 /etc/systemd/system/beszel-agent.service.d
+{
+    echo "# Managed by the dotfiles (chezmoi); rewritten on every change."
+    echo "[Service]"
+    echo {{ printf "Environment=\"HUB_URL=%s\"" .beszel.hub_url | squote }}
+    echo 'Environment="TOKEN="'
+{{- if $tokenHash }}
+    echo 'Environment="TOKEN_FILE=/etc/beszel-agent/token"'
+{{- end }}
+} | sudo tee /etc/systemd/system/beszel-agent.service.d/10-dotfiles.conf >/dev/null
+{{- if $tokenHash }}
+sudo install -d -m 0750 -o root -g beszel /etc/beszel-agent
+sudo install -m 0640 -o root -g beszel "$HOME/.config/beszel/token" /etc/beszel-agent/token
+{{- else }}
+sudo rm -f /etc/beszel-agent/token
+{{- end }}
+sudo systemctl daemon-reload
+sudo systemctl restart beszel-agent.service
+echo "[beszel] agent configured and restarted"
+{{ end -}}
+{{- end -}}

@@ -1,0 +1,4 @@
+{{- /* Renders "true" when this machine receives the decrypted Beszel token:
+       the encrypted token is in the source and the age identity is present
+       (see .chezmoiignore). */ -}}
+{{- if and (glob (joinPath .chezmoi.sourceDir "dot_config/beszel/*token*")) (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt")) }}true{{ end -}}

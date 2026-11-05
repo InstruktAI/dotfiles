@@ -1,0 +1,12 @@
+[Unit]
+Description=Pull the dotfiles source from git and apply it (chezmoi update)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+# DOTFILES_UNATTENDED makes the scripts that need a person (sudo, prompts)
+# render empty, so they wait for the next interactive chezmoi apply.
+Environment=DOTFILES_UNATTENDED=1
+Environment=PATH={{ .chezmoi.homeDir }}/.local/bin:{{ .chezmoi.homeDir }}/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env chezmoi update --no-tty --force

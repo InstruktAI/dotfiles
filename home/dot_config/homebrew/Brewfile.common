@@ -1,0 +1,61 @@
+# Dotfiles Brewfile - cross-platform baseline (macOS + Linux via Homebrew).
+# Deployed by chezmoi to ~/.config/homebrew; `dotfiles-brew install` installs
+# missing entries whenever this file changes.
+# macOS-only tools (casks, GUI/Dock integrations) live in Brewfile.macos.
+
+tap "homebrew/bundle"
+tap "homebrew/services"
+
+# --- Shell & Terminal ---
+brew "bash-completion@2"
+brew "make"
+brew "moreutils"
+brew "vim"
+brew "tmux"
+
+# --- Dev Tools ---
+brew "git"
+brew "git-extras"
+brew "git-lfs"
+brew "gh"
+brew "jq"
+brew "yq"
+brew "shellcheck"
+brew "shfmt"
+brew "tree"
+brew "fd"
+brew "fzf"
+brew "ripgrep"
+brew "eza"
+brew "direnv"
+brew "glow"
+
+# --- Network & HTTP ---
+brew "httpie"
+brew "wget"
+brew "nmap"
+brew "ssh-copy-id"
+brew "watch"
+
+# --- Languages & Runtimes ---
+brew "go"
+# node stays on the v24 line — native modules (better-sqlite3, …) break on newer majors.
+# dotfiles-brew pins any unversioned node so the autoupdate agent can't relink it.
+# pnpm comes from node's bundled corepack (`corepack enable`) — no separate formula.
+brew "node@24", link: true
+brew "uv"
+brew "pipx"
+
+# --- Media & Documents ---
+brew "ffmpeg"
+brew "imagemagick"
+brew "poppler"
+brew "yt-dlp"
+
+# --- Security & Encryption ---
+brew "age"
+brew "chezmoi"
+brew "sops"
+
+# --- System ---
+brew "syncthing"

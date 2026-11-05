@@ -1,35 +1,21 @@
-# Syncthing metadata
-.stfolder/
-.stversions/
-*.sync-conflict-*
-
 # macOS metadata
 .DS_Store
 
-# Machine-specific configs (synced via Syncthing, not git)
-*.local.zsh
-*.local.sh
-homebrew/Brewfile.common.local
-homebrew/Brewfile.macos.local
-.env
-
-# History/backup files and folders
+# Editor local history and backups
 .history/
-.zsh_history
-
-# Editor/runtime backups
 *.bak
 *.tmp
 
 # Python bytecode
 __pycache__/
 
-# Appearance runtime logs and sync-conflict copies
-appearance/agent_state.json
-appearance/bin/*.log
-appearance/bin/*.log.*
-appearance/bin/*.sync-conflict-*
+# Plaintext secrets must never be committed; chezmoi stores them as
+# encrypted_*.age files in home/.
+*.local.zsh
+*.local.sh
+home/dot_config/beszel/*token
 
+# TeleClaude per-machine state
 .teleclaude/
 teleclaude.yml
 teleclaude.yml.lock

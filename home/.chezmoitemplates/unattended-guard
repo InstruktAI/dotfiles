@@ -1,0 +1,4 @@
+{{- /* Renders "true" when chezmoi runs from the scheduled update job, where no
+       person is present to answer sudo or prompts. Scripts that need one render
+       empty then, so chezmoi skips them until the next interactive apply. */ -}}
+{{- if env "DOTFILES_UNATTENDED" }}true{{ end -}}

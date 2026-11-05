@@ -1,0 +1,38 @@
+# Source defaults for every machine. A machine overrides or extends any of
+# these keys under [data] in its own ~/.config/chezmoi/chezmoi.toml; chezmoi
+# deep-merges that data over this file (maps merge, lists and scalars replace).
+#
+# Never commit machine-identifying values here (coordinates, hosts, keys).
+
+[appearance]
+# Minutes before sunset at which dark mode starts, all year.
+dark_offset_minutes = 0
+# Extra minutes before sunset while local daylight saving time is active.
+dst_dark_offset_minutes = 120
+# latitude / longitude are machine-local only. When a machine sets neither,
+# appearance derives its location from the time zone.
+
+[macos]
+# Applied by the macOS defaults script.
+languages = ["en-NL", "nl-NL"]
+locale = "nl_NL@currency=EUR"
+measurement_units = "Centimeters"
+metric_units = true
+
+# Shell aliases that cd into a directory under $HOME, defined only when that
+# directory exists. Machines add their own under [data.zsh.dir_aliases].
+[zsh.dir_aliases]
+cdw = "Workspace"
+cdi = "Workspace/InstruktAI"
+
+[beszel]
+# The hub's public key (KEY) and URL (HUB_URL). The agent is installed only on
+# machines whose data sets `key`; the registration token is a secret and lives
+# encrypted in the source as ~/.config/beszel/token.
+key = ""
+hub_url = ""
+listen = "45876"
+
+[update]
+# How often the scheduled `chezmoi update` pulls and applies the source.
+interval_seconds = 3600

@@ -1,0 +1,3 @@
+{{- if eq .chezmoi.os "darwin" -}}
+{{ template "launchd-reload" dict "label" "ai.instrukt.appearance-system" "hash" (includeTemplate "Library/LaunchAgents/ai.instrukt.appearance-system.plist.tmpl" . | sha256sum) }}
+{{ end -}}

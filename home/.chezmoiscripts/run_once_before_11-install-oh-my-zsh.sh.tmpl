@@ -1,0 +1,13 @@
+{{- if not (includeTemplate "unattended-guard" .) -}}
+#!/bin/bash
+# Installs Oh My Zsh when it is missing. This clones the repository the way its
+# installer does, without the installer's ~/.zshrc rewrite: ~/.zshrc belongs to
+# modify_dot_zshrc, and a before-script must not change a managed target.
+set -euo pipefail
+if [[ -d "$HOME/.oh-my-zsh" ]]; then
+    exit 0
+fi
+echo "Installing Oh My Zsh..."
+git clone -c core.eol=lf -c core.autocrlf=false --depth=1 --branch master \
+    https://github.com/ohmyzsh/ohmyzsh.git "$HOME/.oh-my-zsh"
+{{ end -}}

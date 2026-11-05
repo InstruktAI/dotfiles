@@ -1,0 +1,12 @@
+{{- if eq .chezmoi.os "linux" -}}
+#!/bin/bash
+# Enables the update timer and picks up unit changes. Only the timer restarts;
+# the service may be the very run applying this change.
+# service: {{ includeTemplate "dot_config/systemd/user/chezmoi-update.service.tmpl" . | sha256sum }}
+# timer: {{ includeTemplate "dot_config/systemd/user/chezmoi-update.timer.tmpl" . | sha256sum }}
+set -euo pipefail
+systemctl --user daemon-reload
+systemctl --user enable chezmoi-update.timer
+systemctl --user restart chezmoi-update.timer
+echo "[systemd] chezmoi-update.timer active"
+{{ end -}}
