@@ -2,8 +2,10 @@
 #!/bin/bash
 # macOS system defaults - curated for modern macOS (Sequoia/Tahoe).
 # chezmoi runs this whenever its rendered content changes (it needs sudo and
-# may ask for Full Disk Access, so never from the scheduled update). The
-# locale comes from chezmoi data (macos.*). Idempotent: safe to re-run with
+# may ask for Full Disk Access, so never from the scheduled update). It holds
+# only settings meant for every Mac; where a person's own choice in System
+# Settings is what counts (language, region), it writes nothing. Idempotent:
+# safe to re-run with
 # `chezmoi state delete-bucket --bucket=entryState` followed by `chezmoi apply`.
 
 set -euo pipefail
@@ -103,8 +105,6 @@ defaults write NSGlobalDomain PMPrintingExpandedStateForPrint2 -bool true
 # Quit printer app after print jobs complete
 defaults write com.apple.print.PrintingPrefs "Quit When Finished" -bool true
 
-# Disable the "Are you sure you want to open this application?" dialog
-defaults write com.apple.LaunchServices LSQuarantine -bool false
 
 # Disable auto-termination of inactive apps
 defaults write NSGlobalDomain NSDisableAutomaticTermination -bool true
@@ -113,9 +113,9 @@ defaults write NSGlobalDomain NSDisableAutomaticTermination -bool true
 # Keyboard & Input
 # =============================================================================
 
-# Fastest key repeat
-defaults write NSGlobalDomain KeyRepeat -int 1
-defaults write NSGlobalDomain InitialKeyRepeat -int 10
+# Key repeat at the fastest setting the System Settings slider offers
+defaults write NSGlobalDomain KeyRepeat -int 2
+defaults write NSGlobalDomain InitialKeyRepeat -int 15
 
 # Disable smart quotes (annoying in terminals/code)
 defaults write NSGlobalDomain NSAutomaticQuoteSubstitutionEnabled -bool false
@@ -129,8 +129,6 @@ defaults write NSGlobalDomain NSAutomaticSpellingCorrectionEnabled -bool false
 # Enable full keyboard access for all controls (Tab through all UI elements)
 defaults write NSGlobalDomain AppleKeyboardUIMode -int 3
 
-# Disable press-and-hold for keys in favor of key repeat
-defaults write NSGlobalDomain ApplePressAndHoldEnabled -bool false
 
 # =============================================================================
 # Trackpad
@@ -149,8 +147,9 @@ defaults write NSGlobalDomain com.apple.mouse.tapBehavior -int 1
 defaults write com.apple.screensaver askForPassword -int 1
 defaults write com.apple.screensaver askForPasswordDelay -int 0
 
-# Screenshots: save to ~/Desktop, PNG format, no shadows
-defaults write com.apple.screencapture location -string "$HOME/Desktop"
+# Screenshots: save to the Screenshots folder in iCloud Drive, PNG format, no
+# shadows
+defaults write com.apple.screencapture location -string "$HOME/Library/Mobile Documents/com~apple~CloudDocs/Screenshots"
 defaults write com.apple.screencapture type -string "png"
 defaults write com.apple.screencapture disable-shadow -bool true
 
@@ -199,7 +198,6 @@ defaults write com.apple.finder FXEnableExtensionChangeWarning -bool false
 
 # Enable spring loading for directories
 defaults write NSGlobalDomain com.apple.springing.enabled -bool true
-defaults write NSGlobalDomain com.apple.springing.delay -float 0
 
 # Avoid creating .DS_Store files on network or USB volumes
 defaults write com.apple.desktopservices DSDontWriteNetworkStores -bool true
@@ -229,8 +227,6 @@ defaults write com.apple.dock autohide -bool true
 defaults write com.apple.dock autohide-delay -float 0
 defaults write com.apple.dock autohide-time-modifier -float 0
 
-# Don't auto-rearrange Spaces based on most recent use
-defaults write com.apple.dock mru-spaces -bool false
 
 # Make hidden app icons translucent
 defaults write com.apple.dock showhidden -bool true
@@ -285,15 +281,6 @@ defaults write com.apple.TextEdit PlainTextEncodingForWrite -int 4
 
 # Enable WebKit Developer Tools in Mac App Store
 defaults write com.apple.appstore WebKitDeveloperExtras -bool true
-
-# =============================================================================
-# Locale (chezmoi data: macos.*)
-# =============================================================================
-
-defaults write NSGlobalDomain AppleLanguages -array{{ range .macos.languages }} {{ . | quote }}{{ end }}
-defaults write NSGlobalDomain AppleLocale -string {{ .macos.locale | quote }}
-defaults write NSGlobalDomain AppleMeasurementUnits -string {{ .macos.measurement_units | quote }}
-defaults write NSGlobalDomain AppleMetricUnits -bool {{ .macos.metric_units }}
 
 # =============================================================================
 # Restart affected applications

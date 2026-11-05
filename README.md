@@ -103,7 +103,6 @@ when it regenerates the config.
 | `appearance.latitude`, `appearance.longitude` | unset | Explicit coordinates for sunrise/sunset. Unset: derived from the time zone. Machine-local only; never commit coordinates. |
 | `appearance.dark_offset_minutes` | source default | Start dark mode this many minutes before sunset. |
 | `appearance.dst_dark_offset_minutes` | source default | Extra minutes while local DST is active. |
-| `macos.languages`, `macos.locale`, `macos.measurement_units`, `macos.metric_units` | source default | Locale written by the macOS defaults script. |
 | `macos.battery_sleep_minutes` | unset | Idle minutes before a laptop sleeps on battery. Unset: never sleeps, like on AC. |
 | `zsh.dir_aliases` | `cdw`, `cdi` | `alias name="cd ~/<dir>"`, defined when the directory exists. |
 | `profile` | `server` | The machine's role: `workstation` or `server`. Only a workstation gets `Brewfile.workstation`. |
