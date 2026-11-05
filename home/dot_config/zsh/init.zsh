@@ -52,7 +52,12 @@ fi
 #    where the tool is present.
 [[ -r "$HOME/Workspace/InstruktAI/TeleClaude/bin/telec-completion.zsh" ]] && \
     source "$HOME/Workspace/InstruktAI/TeleClaude/bin/telec-completion.zsh"
-[[ -r "$HOME/srv/bin/itsup-completion.sh" ]] && source "$HOME/srv/bin/itsup-completion.sh"
+# itsUP lives in ~/srv on servers and in a workspace checkout elsewhere.
+for itsup_completion in "$HOME/srv/bin/itsup-completion.sh" \
+    "$HOME/Workspace/morriz/itsUP/bin/itsup-completion.sh"; do
+  [[ -r "$itsup_completion" ]] && source "$itsup_completion" && break
+done
+unset itsup_completion
 
 # Clean up variables
 unset ZSH_CONFIG_DIR config_file

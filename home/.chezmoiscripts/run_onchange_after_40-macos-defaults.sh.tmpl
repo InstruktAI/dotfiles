@@ -163,6 +163,11 @@ defaults write com.apple.screencapture disable-shadow -bool true
 # packet wakes the host, and the cycle re-fires the "remotely controlled" banner
 # on a loop. Display sleep (displaysleep) is left untouched.
 sudo pmset -a sleep 0
+{{- if hasKey .macos "battery_sleep_minutes" }}
+# On battery, sleep after this machine's own idle time (chezmoi data:
+# macos.battery_sleep_minutes); a laptop is not kept awake for Screen Sharing.
+sudo pmset -b sleep {{ .macos.battery_sleep_minutes | int }}
+{{- end }}
 
 # =============================================================================
 # Finder
