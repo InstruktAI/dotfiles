@@ -4,8 +4,6 @@
 # macOS-only tools live in Brewfile.macos; what only a workstation needs (apps,
 # media and document tools) lives in Brewfile.workstation.
 
-tap "homebrew/bundle"
-tap "homebrew/services"
 
 # --- Shell & Terminal ---
 brew "bash-completion@2"
