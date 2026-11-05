@@ -1,0 +1,30 @@
+{{- if eq .profile "workstation" -}}
+# Dotfiles Brewfile - what only a workstation needs: language toolchains, media
+# and document tools, and on macOS the desktop apps. Deployed by chezmoi to
+# ~/.config/homebrew only on machines whose chezmoi data sets
+# profile = "workstation". Elsewhere the template renders empty, so chezmoi
+# removes it: a machine that stops being a workstation stops installing from
+# it, and the packages already installed stay.
+
+# --- Languages & Runtimes ---
+brew "go"
+
+# --- Media & Documents ---
+brew "imagemagick"
+brew "poppler"
+brew "yt-dlp"
+{{- if eq .chezmoi.os "darwin" }}
+
+# --- System (macOS Dock / app-preference sync) ---
+brew "dockutil"
+brew "mackup"
+
+# --- Casks ---
+cask "docker-desktop"
+cask "handy"
+cask "ngrok"
+cask "raycast"
+cask "visual-studio-code"
+cask "vlc"
+{{- end }}
+{{- end }}

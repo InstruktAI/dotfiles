@@ -1,5 +1,7 @@
-# Dotfiles Brewfile - macOS-only tools: GNU userland overrides, GUI apps, and
-# OS-integration formulae that don't build or don't make sense on Linux.
+# Dotfiles Brewfile - macOS-only tools for every Mac, server or workstation: GNU
+# userland overrides, the terminal, and OS-integration formulae that don't
+# build or don't make sense on Linux. Apps only a workstation needs live in
+# Brewfile.workstation.
 # Deployed by chezmoi to ~/.config/homebrew on macOS only.
 
 # --- GNU userland (macOS ships BSD variants; Linux already has these natively) ---
@@ -15,15 +17,6 @@ brew "reattach-to-user-namespace"
 # --- Security & Encryption (macOS Keychain integration) ---
 brew "pinentry-mac"
 
-# --- System (macOS Dock / app-preference sync) ---
-brew "dockutil"
-brew "mackup"
 
 # --- Casks ---
-cask "docker-desktop"
-cask "handy"
 cask "iterm2"
-cask "ngrok"
-cask "raycast"
-cask "visual-studio-code"
-cask "vlc"

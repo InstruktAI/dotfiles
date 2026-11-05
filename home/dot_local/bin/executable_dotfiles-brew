@@ -57,13 +57,16 @@ pin_node_formula() {
     fi
 }
 
-# Brewfile.common applies on every OS; Brewfile.macos (casks, GNU-userland
-# overrides, Dock/Keychain integration) only makes sense on Darwin.
+# Brewfile.common applies on every OS; Brewfile.macos (GNU-userland overrides,
+# the terminal, Keychain integration) only makes sense on Darwin.
+# Brewfile.workstation is deployed only to workstations, so its presence is
+# the machine's profile.
 brew_bundle_files() {
     echo "$BREWFILE_DIR/Brewfile.common"
     if [[ "$OS" == "Darwin" ]]; then
         echo "$BREWFILE_DIR/Brewfile.macos"
     fi
+    echo "$BREWFILE_DIR/Brewfile.workstation"
 }
 
 run_brew_bundle() {
