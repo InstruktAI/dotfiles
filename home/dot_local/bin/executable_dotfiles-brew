@@ -94,7 +94,7 @@ run_brew_bundle() {
         if ! HOMEBREW_BUNDLE_NO_UPGRADE=1 \
             HOMEBREW_NO_INSTALL_UPGRADE=1 \
             HOMEBREW_CASK_OPTS="--adopt" \
-            brew bundle install --file="$brewfile" --no-lock --no-upgrade; then
+            brew bundle install --file="$brewfile" --no-upgrade; then
             echo "  [WARN] Some entries did not install (e.g. an app already present"
             echo "         at a different version). Continuing."
         fi
