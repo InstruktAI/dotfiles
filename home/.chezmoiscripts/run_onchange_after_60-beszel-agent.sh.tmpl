@@ -40,7 +40,7 @@ echo "[beszel] agent (re)started; logs: ~/.cache/beszel/beszel-agent.log"
 # The install script needs root (it creates the beszel user and a system
 # service), so this runs only from an interactive apply. It receives the key
 # and port; the hub URL and the token are reconciled in a drop-in this script
-# owns, so a cleared value is cleared and the token never appears in a
+# owns, so a cleared value is cleared and the token never appears on a
 # command line or in the world-readable unit file.
 # key: {{ .beszel.key | sha256sum }}
 # hub: {{ .beszel.hub_url | sha256sum }}
@@ -53,11 +53,16 @@ curl -sL https://get.beszel.dev -o "$installer"
 chmod +x "$installer"
 "$installer" -k {{ .beszel.key | quote }} -p {{ .beszel.listen | quote }} --auto-update true
 
+# A token passed to the installer earlier sits in plaintext in the unit, and a
+# non-empty TOKEN wins over TOKEN_FILE: blank it there (as the installer edits
+# that line itself) and in the drop-in, which systemd applies after the unit.
+sudo sed -i 's|^Environment="TOKEN=.*"|Environment="TOKEN="|' /etc/systemd/system/beszel-agent.service
 sudo install -d -m 0755 /etc/systemd/system/beszel-agent.service.d
 {
     echo "# Managed by the dotfiles (chezmoi); rewritten on every change."
     echo "[Service]"
     echo {{ printf "Environment=\"HUB_URL=%s\"" .beszel.hub_url | squote }}
+    echo 'Environment="TOKEN="'
 {{- if $tokenHash }}
     echo 'Environment="TOKEN_FILE=/etc/beszel-agent/token"'
 {{- end }}
