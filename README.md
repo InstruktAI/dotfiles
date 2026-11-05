@@ -104,6 +104,7 @@ when it regenerates the config.
 | `appearance.dark_offset_minutes` | source default | Start dark mode this many minutes before sunset. |
 | `appearance.dst_dark_offset_minutes` | source default | Extra minutes while local DST is active. |
 | `macos.languages`, `macos.locale`, `macos.measurement_units`, `macos.metric_units` | source default | Locale written by the macOS defaults script. |
+| `macos.battery_sleep_minutes` | unset | Idle minutes before a laptop sleeps on battery. Unset: never sleeps, like on AC. |
 | `zsh.dir_aliases` | `cdw`, `cdi` | `alias name="cd ~/<dir>"`, defined when the directory exists. |
 | `beszel.key` | empty | The Beszel hub's public key. Setting it installs the agent. |
 | `beszel.hub_url` | empty | The Beszel hub URL (`HUB_URL`). |
