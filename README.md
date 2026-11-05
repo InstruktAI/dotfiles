@@ -106,6 +106,7 @@ when it regenerates the config.
 | `macos.languages`, `macos.locale`, `macos.measurement_units`, `macos.metric_units` | source default | Locale written by the macOS defaults script. |
 | `macos.battery_sleep_minutes` | unset | Idle minutes before a laptop sleeps on battery. Unset: never sleeps, like on AC. |
 | `zsh.dir_aliases` | `cdw`, `cdi` | `alias name="cd ~/<dir>"`, defined when the directory exists. |
+| `profile` | `server` | The machine's role: `workstation` or `server`. Only a workstation gets `Brewfile.workstation`. |
 | `beszel.key` | empty | The Beszel hub's public key. Setting it installs the agent. |
 | `beszel.hub_url` | empty | The Beszel hub URL (`HUB_URL`). |
 | `beszel.listen` | source default | Agent port or address (`LISTEN`). |
@@ -139,7 +140,7 @@ The repository root holds project files; `.chezmoiroot` points chezmoi at
 | `home/.chezmoitemplates/` | Shared template fragments. |
 | `home/modify_dot_zshrc` | Manages one block inside `~/.zshrc`. |
 | `home/dot_config/zsh/` | Modular zsh configuration → `~/.config/zsh`. |
-| `home/dot_config/homebrew/` | `Brewfile.common` (every OS) and `Brewfile.macos` → `~/.config/homebrew`. |
+| `home/dot_config/homebrew/` | `Brewfile.common` (every machine), `Brewfile.macos` (every Mac) and `Brewfile.workstation` (workstations) → `~/.config/homebrew`. |
 | `home/dot_local/bin/` | `appearance`, `dotfiles-brew`, `brew-autoupdate*` → `~/.local/bin`. |
 | `home/dot_local/libexec/appearance/` | macOS appearance watcher (binary and Swift source). |
 | `home/Library/LaunchAgents/` | macOS launchd agents (templates). |
@@ -216,8 +217,13 @@ user option from outside this file.
 ## Homebrew
 
 - `Brewfile.common` — baseline package list for every OS Homebrew supports.
-- `Brewfile.macos` — casks, GNU-userland overrides (macOS ships BSD tools; Linux
-  already has GNU natively), and Dock/Keychain integrations; macOS only.
+- `Brewfile.macos` — GNU-userland overrides (macOS ships BSD tools; Linux
+  already has GNU natively), the terminal and Keychain integration; every Mac.
+- `Brewfile.workstation` — what only a workstation needs: language toolchains,
+  media and document tools, and on macOS the desktop apps; deployed only where
+  the machine's data sets `profile = "workstation"`.
+- The Brewfiles are a floor, not a mirror: installing adds what is missing and
+  never removes anything, so a package installed by hand on one machine stays.
 - `dotfiles-brew install|diff|upgrade` — installs missing entries (chezmoi runs it
   when a Brewfile changes), shows what install would add, or upgrades formulae
   while holding back major-version bumps and casks.

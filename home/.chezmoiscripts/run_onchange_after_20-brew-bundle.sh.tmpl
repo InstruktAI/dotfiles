@@ -5,6 +5,9 @@
 {{- if eq .chezmoi.os "darwin" }}
 # Brewfile.macos: {{ include "dot_config/homebrew/Brewfile.macos" | sha256sum }}
 {{- end }}
+{{- if eq .profile "workstation" }}
+# Brewfile.workstation: {{ includeTemplate "dot_config/homebrew/Brewfile.workstation.tmpl" . | sha256sum }}
+{{- end }}
 set -euo pipefail
 exec "$HOME/.local/bin/dotfiles-brew" install
 {{ end -}}

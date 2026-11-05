@@ -4,6 +4,11 @@
 #
 # Never commit machine-identifying values here (coordinates, hosts, keys).
 
+# The machine's role: "workstation" (a machine a person works at) or "server"
+# (a machine that runs things). Only a workstation gets Brewfile.workstation.
+# The default is the smaller set; a workstation says so in its own data.
+profile = "server"
+
 [appearance]
 # Minutes before sunset at which dark mode starts, all year.
 dark_offset_minutes = 0
