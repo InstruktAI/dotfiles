@@ -1,0 +1,37 @@
+{{- /*
+  Generates ~/.config/chezmoi/chezmoi.toml on `chezmoi init`.
+
+  Age encryption is enabled once the machine's identity exists at
+  ~/.config/chezmoi/key.txt; its recipient is read from the "# public key:"
+  line that age-keygen writes into that file.
+
+  Machine-local data (everything under [data]) is carried over verbatim each
+  time this template is regenerated, so `chezmoi init` never drops it.
+*/ -}}
+{{- $identity := joinPath .chezmoi.homeDir ".config/chezmoi/key.txt" -}}
+{{- $hasIdentity := stat $identity -}}
+{{- $recipient := "" -}}
+{{- if $hasIdentity -}}
+{{-   $recipient = include $identity | regexFind "age1[0-9a-z]+" -}}
+{{-   if not $recipient -}}
+{{-     fail (printf "%s has no \"# public key: age1...\" line; recreate it with age-keygen" $identity) -}}
+{{-   end -}}
+{{- end -}}
+{{- if $hasIdentity }}
+encryption = "age"
+{{- end }}
+
+[diff]
+    exclude = ["scripts"]
+
+{{- if $hasIdentity }}
+
+[age]
+    identity = {{ $identity | quote }}
+    recipient = {{ $recipient | quote }}
+{{- end }}
+{{- $data := omit . "chezmoi" }}
+{{- if $data }}
+
+{{ dict "data" $data | toToml }}
+{{- end }}

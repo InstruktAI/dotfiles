@@ -20,6 +20,10 @@ The script should do this: \(ai.prompt).</string>
 	<integer>2</integer>
 	<key>AIVectorStore</key>
 	<integer>0</integer>
+	<key>AboutToPasteTabsWithCancel</key>
+	<true/>
+	<key>AboutToPasteTabsWithCancel_selection</key>
+	<integer>2</integer>
 	<key>AiMaxTokens</key>
 	<integer>1050000</integer>
 	<key>AiModel</key>
@@ -38,6 +42,33 @@ The script should do this: \(ai.prompt).</string>
 	<false/>
 	<key>CheckTestRelease</key>
 	<false/>
+	<key>CodeReviewSavedPrompts</key>
+	<data>
+	W3sidGV4dCI6IlJldmlldyB0aGUgcGVuZGluZyBjaGFuZ2VzIGluIHRoaXMgcmVwby4g
+	RmxhZyBpc3N1ZXMgYSBjYXJlZnVsIG1haW50YWluZXIgd291bGQgYmxvY2sgb24gYmVm
+	b3JlIG1lcmdlLCBpbiByb3VnaGx5IHRoaXMgb3JkZXI6XG4gIDEuIENvcnJlY3RuZXNz
+	IOKAlCBsb2dpYyBlcnJvcnMsIGJyb2tlbiBpbnZhcmlhbnRzLCBtaXNzZWQgZWRnZSBj
+	YXNlcywgb2ZmLWJ5LW9uZSwgcmFjZXMsIGxpZmV0aW1lXC9tZW1vcnkgYnVncywgZXJy
+	b3IgcGF0aHMgdGhhdCBzd2FsbG93IGZhaWx1cmVzLlxuICAyLiBTZWN1cml0eSDigJQg
+	aW5qZWN0aW9uLCBhdXRoblwvYXV0aHogbWlzdGFrZXMsIHNlY3JldCBoYW5kbGluZywg
+	dW5zYWZlIGRlc2VyaWFsaXphdGlvbiwgdW5zYWZlIGRlZmF1bHRzLCBUT0NUT1UuXG4g
+	IDMuIFJlbGlhYmlsaXR5ICYgcGVyZm9ybWFuY2Ug4oCUIGJsb2NraW5nIHRoZSB3cm9u
+	ZyB0aHJlYWQsIHVuYm91bmRlZCByZXNvdXJjZSB1c2UsIGFjY2lkZW50YWwgTyhOwrIp
+	LCByZXRyaWVzIHdpdGhvdXQgYmFja29mZiwgc2lsZW50IGZhaWx1cmUgcGF0aHMuXG4g
+	IDQuIENvbnRyYWN0IHJpc2sg4oCUIGJlaGF2aW9yIGNoYW5nZXMgY2FsbGVycyByZWx5
+	IG9uLCBzaWxlbnRseSBjaGFuZ2VkIGRlZmF1bHRzLCBicm9rZW4gYmFja3dhcmQgY29t
+	cGF0aWJpbGl0eSwgbWlzc2luZyBtaWdyYXRpb25zLlxuXG5Gb3IgZWFjaCBmaW5kaW5n
+	IGNpdGUgYGZpbGU6bGluZWAsIGV4cGxhaW4gKndoeSogaXQgaXMgd3JvbmcgKG5vdCB3
+	aGF0IHRoZSBjb2RlIGRvZXMpLCBhbmQgcHJvcG9zZSBhIGNvbmNyZXRlIGZpeCB3aGVu
+	IG9uZSBpcyBvYnZpb3VzLiBCZSBjYWxpYnJhdGVkOiBpZiBhIGZpbmRpbmcgaXMgbm90
+	IGhpZ2gtY29uZmlkZW5jZSwgc2F5IHNvIG9yIHNraXAgaXQuIFZlcmlmeSBjbGFpbXMg
+	YWdhaW5zdCB0aGUgYWN0dWFsIGNvZGUgcmF0aGVyIHRoYW4gaW5mZXJyaW5nIGZyb20g
+	bmFtZXMuXG5cblNraXAgcHVyZSBzdHlsZSwgZm9ybWF0dGluZywgbmFtaW5nLCBhbmQg
+	YW55dGhpbmcgYSBsaW50ZXIgb3IgQ0kgYWxyZWFkeSBlbmZvcmNlcy5cblxuSWYgeW91
+	IGZpbmQgbm90aGluZyB3b3J0aCBmaXhpbmcsIHNheSBzbyBwbGFpbmx5LiIsInV1aWQi
+	OiIxOEU2Njk0QS0xMjgzLTQ0MDYtQUY0NC04MjA2NkY3OUExMEUiLCJuYW1lIjoiRGVm
+	YXVsdCJ9XQ==
+	</data>
 	<key>CodeciergeRegularPrompt</key>
 	<string>You help me in a terminal emulator. My goal is $GOAL. $CONTEXT. Start by suggesting a command. Don't overwhelm me with too much information: just go one step at a time. When I've reached my goal, remind me to click the End Task button.</string>
 	<key>Command</key>
@@ -48,7 +79,7 @@ The script should do this: \(ai.prompt).</string>
 	<true/>
 	<key>GlobalKeyMap</key>
 	<dict>
-		<key>0xd-0x20000-0x24</key>
+		<key>0xd-0x20000-0x24-0x1</key>
 		<dict>
 			<key>Action</key>
 			<integer>12</integer>
@@ -2093,6 +2124,8 @@ The script should do this: \(ai.prompt).</string>
 	</array>
 	<key>OnlyWhenMoreTabs</key>
 	<false/>
+	<key>OpenBookmark</key>
+	<false/>
 	<key>PasteTabToStringTabStopSize</key>
 	<integer>4</integer>
 	<key>PointerActions</key>
@@ -2145,6 +2178,37 @@ The script should do this: \(ai.prompt).</string>
 	</array>
 	<key>VisualIndicatorForEsc</key>
 	<false/>
+	<key>Workgroups</key>
+	<data>
+	W3sidW5pcXVlSWRlbnRpZmllciI6ImJ1aWx0aW4uY2xhdWRlQ29kZSIsInNlc3Npb25z
+	IjpbeyJtb2RlIjoicmVndWxhciIsInBlckZpbGVDb21tYW5kIjoiIiwidG9vbGJhckl0
+	ZW1zIjpbeyJraW5kIjoibW9kZVN3aXRjaGVyIn0seyJraW5kIjoiZ2l0U3RhdHVzIn0s
+	eyJraW5kIjoiYXV0b1JlcXVlc3RSZXZpZXdXaGVuSWRsZSJ9XSwidW5pcXVlSWRlbnRp
+	ZmllciI6ImJ1aWx0aW4uY2xhdWRlQ29kZS5tYWluIiwiY29tbWFuZCI6IiIsImtpbmQi
+	Onsia2luZCI6InJvb3QifSwiZGlzcGxheU5hbWUiOiJDaGF0IiwidXJsU3RyaW5nIjoi
+	In0seyJtb2RlIjoiZGlmZiIsInBhcmVudElEIjoiYnVpbHRpbi5jbGF1ZGVDb2RlLm1h
+	aW4iLCJwZXJGaWxlQ29tbWFuZCI6ImdpdCBkaWZmdG9vbCAteSAteCB2aW1kaWZmIFxc
+	KGdpdEJhc2UpIC0tIFxcKGZpbGUpIiwidG9vbGJhckl0ZW1zIjpbeyJraW5kIjoibW9k
+	ZVN3aXRjaGVyIn0seyJraW5kIjoiY2hhbmdlZEZpbGVTZWxlY3RvciJ9LHsia2luZCI6
+	ImdpdEJhc2VTZWxlY3RvciJ9LHsiZm9yd2FyZFNob3J0Y3V0Ijp7InNlcmlhbGl6ZWQi
+	OiIweGY3MDMtMHgzNDAwMDAtMHg3YyJ9LCJiYWNrU2hvcnRjdXQiOnsic2VyaWFsaXpl
+	ZCI6IjB4ZjcwMi0weDM0MDAwMC0weDdiIn0sImtpbmQiOiJuYXZpZ2F0aW9uIiwicmVs
+	b2FkU2hvcnRjdXQiOnsic2VyaWFsaXplZCI6IjB4NzItMHgxMDAwMDAtMHhmIn19XSwi
+	dW5pcXVlSWRlbnRpZmllciI6ImJ1aWx0aW4uY2xhdWRlQ29kZS5kaWZmIiwia2luZCI6
+	eyJraW5kIjoicGVlciJ9LCJjb21tYW5kIjoiZ2l0IGRpZmZ0b29sIC15IC14IHZpbWRp
+	ZmYgXFwoZ2l0QmFzZSkiLCJkaXNwbGF5TmFtZSI6IkRpZmYiLCJ1cmxTdHJpbmciOiIi
+	fSx7Im1vZGUiOiJjb2RlUmV2aWV3IiwicGFyZW50SUQiOiJidWlsdGluLmNsYXVkZUNv
+	ZGUubWFpbiIsInBlckZpbGVDb21tYW5kIjoiIiwidG9vbGJhckl0ZW1zIjpbeyJraW5k
+	IjoibW9kZVN3aXRjaGVyIn0seyJzaG9ydGN1dCI6eyJzZXJpYWxpemVkIjoiMHg3Mi0w
+	eDEwMDAwMC0weGYifSwia2luZCI6InJlbG9hZCJ9LHsia2luZCI6ImF1dG9TZW5kQ2xp
+	cHBpbmdzV2hlbklkbGUifV0sInVuaXF1ZUlkZW50aWZpZXIiOiJidWlsdGluLmNsYXVk
+	ZUNvZGUucmV2aWV3Iiwia2luZCI6eyJraW5kIjoicGVlciJ9LCJjb21tYW5kIjoiY2xh
+	dWRlIFxcKGNvZGVSZXZpZXdQcm9tcHQpIC0tYXBwZW5kLXN5c3RlbS1wcm9tcHQtZmls
+	ZSAnXFwoY29kZVJldmlld1N5c3RlbVByb21wdEZpbGUpJyAtLXNldHRpbmdzICdcXChp
+	dGVybTIuYXBwQnVuZGxlUGF0aClcL0NvbnRlbnRzXC9SZXNvdXJjZXNcL2NvZGUtcmV2
+	aWV3LXNldHRpbmdzLnR4dCciLCJkaXNwbGF5TmFtZSI6IkNvZGUgUmV2aWV3IiwidXJs
+	U3RyaW5nIjoiIn1dLCJuYW1lIjoiQ2xhdWRlIENvZGUifV0=
+	</data>
 	<key>disableMetalWhenUnplugged</key>
 	<false/>
 	<key>findMode_iTerm</key>

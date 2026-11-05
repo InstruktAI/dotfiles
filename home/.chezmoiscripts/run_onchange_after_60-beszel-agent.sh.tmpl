@@ -1,0 +1,50 @@
+{{- /*
+  Installs and (re)starts the Beszel agent on machines whose chezmoi data sets
+  beszel.key, following https://www.beszel.dev/guide/agent-installation:
+  macOS through the henrygd/beszel Homebrew tap and `brew services` (its
+  environment is ~/.config/beszel/beszel-agent.env, rendered by chezmoi);
+  Linux through the official install script as a systemd service. The script
+  reruns whenever the agent's configuration or the encrypted token changes.
+*/ -}}
+{{- $tokenHash := "" -}}
+{{- range glob (joinPath .chezmoi.sourceDir "dot_config/beszel/*token*") -}}
+{{-   $tokenHash = include . | sha256sum -}}
+{{- end -}}
+{{- if .beszel.key -}}
+{{- if eq .chezmoi.os "darwin" -}}
+#!/bin/bash
+# environment: {{ includeTemplate "dot_config/beszel/private_beszel-agent.env.tmpl" . | sha256sum }}
+# token: {{ $tokenHash }}
+set -euo pipefail
+mkdir -p "$HOME/.config/beszel" "$HOME/.cache/beszel"
+brew tap henrygd/beszel
+brew trust henrygd/beszel/beszel-agent
+if ! brew list --formula beszel-agent >/dev/null 2>&1; then
+    brew install beszel-agent
+fi
+brew services restart beszel-agent
+echo "[beszel] agent (re)started; logs: ~/.cache/beszel/beszel-agent.log"
+{{ else if and (eq .chezmoi.os "linux") (not (includeTemplate "unattended-guard" .)) -}}
+#!/bin/bash
+# The install script needs root (it creates the beszel user and a system
+# service), so this runs only from an interactive apply.
+# key: {{ .beszel.key | sha256sum }}
+# hub: {{ .beszel.hub_url | sha256sum }}
+# listen: {{ .beszel.listen }}
+# token: {{ $tokenHash }}
+set -euo pipefail
+installer="$(mktemp)"
+trap 'rm -f "$installer"' EXIT
+curl -sL https://get.beszel.dev -o "$installer"
+chmod +x "$installer"
+args=(-k {{ .beszel.key | quote }} -p {{ .beszel.listen | quote }} --auto-update true)
+{{- if .beszel.hub_url }}
+args+=(-url {{ .beszel.hub_url | quote }})
+{{- end }}
+token_file="$HOME/.config/beszel/token"
+if [[ -r "$token_file" ]]; then
+    args+=(-t "$(<"$token_file")")
+fi
+"$installer" "${args[@]}"
+{{ end -}}
+{{- end -}}

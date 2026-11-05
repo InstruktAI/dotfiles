@@ -1,0 +1,17 @@
+[Unit]
+Description=Appearance watcher: keep terminal and agent themes in sync with dark/light
+
+[Service]
+Type=simple
+ExecStart={{ .chezmoi.homeDir }}/.local/bin/appearance watch
+# The appearance script runs through `uv run --script`; systemd's default PATH
+# does not include the user or Homebrew bin directories uv lives in.
+Environment=PATH={{ .chezmoi.homeDir }}/.local/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
+Restart=always
+RestartSec=30
+# `appearance watch` is an untrapped poll loop; on stop/restart systemd's SIGTERM
+# makes uv exit 143 (128+SIGTERM). Treat that as a clean stop, not a failure.
+SuccessExitStatus=143 SIGTERM
+
+[Install]
+WantedBy=default.target

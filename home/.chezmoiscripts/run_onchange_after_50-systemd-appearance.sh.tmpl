@@ -1,0 +1,11 @@
+{{- if eq .chezmoi.os "linux" -}}
+#!/bin/bash
+# Restarts the appearance watcher when its unit or configuration changes.
+# unit: {{ includeTemplate "dot_config/systemd/user/appearance.service.tmpl" . | sha256sum }}
+# config: {{ includeTemplate "dot_config/appearance/config.toml.tmpl" . | sha256sum }}
+set -euo pipefail
+systemctl --user daemon-reload
+systemctl --user enable appearance.service
+systemctl --user restart appearance.service
+echo "[systemd] appearance.service restarted"
+{{ end -}}

@@ -1,0 +1,12 @@
+# Rendered by chezmoi from its data; change the dotfiles source or this
+# machine's chezmoi data, not this file. Read by ~/.local/bin/appearance.
+{{- if or (hasKey .appearance "latitude") (hasKey .appearance "longitude") }}
+
+[location]
+latitude = {{ .appearance.latitude | toJson }}
+longitude = {{ .appearance.longitude | toJson }}
+{{- end }}
+
+[dark_offset]
+minutes = {{ .appearance.dark_offset_minutes | toJson }}
+dst_minutes = {{ .appearance.dst_dark_offset_minutes | toJson }}

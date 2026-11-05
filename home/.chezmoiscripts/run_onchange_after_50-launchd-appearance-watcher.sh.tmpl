@@ -1,0 +1,4 @@
+{{- if eq .chezmoi.os "darwin" -}}
+{{- $hash := print (includeTemplate "Library/LaunchAgents/ai.instrukt.appearance-watcher.plist.tmpl" . | sha256sum) " binary " (include "dot_local/libexec/appearance/executable_appearance-watcher" | sha256sum) -}}
+{{ template "launchd-reload" dict "label" "ai.instrukt.appearance-watcher" "hash" $hash }}
+{{ end -}}

@@ -1,0 +1,10 @@
+[Unit]
+Description=Scheduled chezmoi update
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec={{ .update.interval_seconds }}s
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

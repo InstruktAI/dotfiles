@@ -1,44 +1,52 @@
 # Dotfiles
 
-This directory contains personal dotfiles for creating a consistent and powerful terminal environment across macOS and Linux systems.
+Personal dotfiles for a consistent terminal environment across macOS and Linux,
+managed with chezmoi. `README.md` is the full reference; this file is what an
+agent needs before changing anything.
 
-## Directory Overview
+## How it works
 
-This is a non-code project, acting as a collection of configuration files and setup scripts. Its primary purpose is to bootstrap a developer's environment by symlinking configuration files into their expected locations and setting up shell integrations.
+- The repository is a chezmoi source. `.chezmoiroot` points chezmoi at `home/`;
+  the root stays free for project files (docs, CI).
+- Every machine installs it with `chezmoi init --apply InstruktAI/dotfiles`
+  (clone in `~/.local/share/chezmoi`) and pulls changes through a scheduled
+  `chezmoi update` (launchd on macOS, a systemd `--user` timer on Linux).
+- Machine differences are templates plus chezmoi data: defaults in
+  `home/.chezmoidata/defaults.toml`, per-machine overrides under `[data]` in
+  that machine's `~/.config/chezmoi/chezmoi.toml`. There are no `*.local.*`
+  override files.
+- Secrets are age-encrypted files in the source (`encrypted_*.age`); each machine
+  holds the identity at `~/.config/chezmoi/key.txt`.
+- Install steps are `run_once_`/`run_onchange_` scripts in `home/.chezmoiscripts/`.
 
-The setup is heavily geared towards `zsh` as the primary shell, `tmux` for terminal multiplexing, and a suite of common developer tools.
+## Rules for changes
 
-## Key Features & Conventions
+- Change the source in git, never a managed file in `~`: the next apply or
+  scheduled update overwrites it.
+- Never commit machine-identifying values: coordinates, host names, usernames,
+  keys, absolute machine paths. Those belong in machine-local chezmoi data.
+- Never commit a plaintext secret. Add secrets with `chezmoi add --encrypt`.
+- Scripts must be idempotent. A script that needs a person (sudo, prompts) is
+  wrapped in the `unattended-guard` check so the scheduled update skips it.
+- A `run_onchange_` script that must react to another file carries that file's
+  hash in a comment (`include …| sha256sum` or `includeTemplate …| sha256sum`).
+- Verify against a throwaway destination, never the real home: run chezmoi with
+  `HOME` set to a temporary directory, `--source` pointing at this checkout,
+  and `apply --exclude=scripts`; render scripts and other OSes with
+  `chezmoi execute-template --override-data '{"chezmoi":{"os":"linux"}}'`.
 
-*   **Idempotent Installation**: The main `install.sh` script is designed to be run multiple times without causing issues. It creates backups of existing files and correctly handles symlinks.
-*   **zsh-centric**: The shell environment is managed through a series of files in the `zsh/` directory, loaded in a specific order. This includes helpers, path management, environment variables, secrets (expected to be in a separate file), aliases, and tool-specific initializations.
-*   **Cross-Platform Appearance Theming**: The `appearance/` directory synchronizes dark/light mode across the terminal, `tmux`, and CLI tools. macOS uses a native Swift watcher (`appearance-watcher`) for event-driven changes plus a launchd solar job; Linux uses a systemd `--user` service that polls. `APPEARANCE_MODE`/`TERMINAL_BG` env overrides let a host's theme be replicated across machines.
-*   **Tool Integrations**: The configuration includes setup for many common developer tools, such as:
-    *   `git` (with many aliases)
-    *   `docker` and `docker compose`
-    *   `eza` (as a modern `ls` replacement)
-    *   `fzf` (for fuzzy finding)
-    *   `direnv` (for project-specific environments)
-    *   AI CLIs (`claude`, `codex`, `gemini`)
-*   **Local Overrides**: The configuration is designed to be extended with machine-specific settings. For example, `zsh/40-tools.zsh` will source a `40-tools.local.zsh` if it exists, allowing for private or machine-specific tool setups.
+## Where things are
 
-## Usage and Installation
-
-The primary entrypoint is the `Makefile`.
-
-**Installation Commands:**
-
-```bash
-make install          # user tier: symlinks, shell activation, log provisioning
-make install-runtime  # daemon tier: launchd (macOS) or systemd --user (Linux)
-```
-
-**What `make install` does:**
-
-1.  Symlinks the `zsh/` directory to `~/.config/zsh`.
-2.  Symlinks `appearance/bin/appearance.py` to `~/.local/bin/appearance` (requires `~/.local/bin` to be in the `PATH`).
-3.  Symlinks `tmux/tmux.conf` to `~/.tmux.conf`.
-
-**What `make install-runtime` does:** installs the appearance service tier — on macOS the launchd agents (the Swift watcher and the solar `apply-system` job); on Linux a systemd `--user` service running `appearance watch`.
-
-After running the script, you may need to update your `~/.zshrc` to source the new configuration, as prompted by the script.
+- `home/dot_config/zsh/` — modular zsh configuration (see its `AGENTS.md`).
+- `home/modify_dot_zshrc` — keeps the block that sources `~/.config/zsh/init.zsh`
+  inside the machine's own `~/.zshrc`.
+- `home/dot_local/bin/executable_appearance` and
+  `home/dot_local/libexec/appearance/` — appearance management (see that
+  directory's `AGENTS.md`).
+- `home/dot_config/homebrew/` — Brewfiles; `dotfiles-brew` installs, diffs and
+  upgrades from them.
+- `home/Library/LaunchAgents/`, `home/dot_config/systemd/user/` — service
+  definitions; their `run_onchange_after_50-*` scripts reload them.
+- `home/.chezmoiscripts/run_onchange_after_60-beszel-agent.sh.tmpl` — Beszel
+  monitoring agent, installed where `beszel.key` is set.
+- `iterm2/` — iTerm2 preferences folder, read and written in the working tree.
