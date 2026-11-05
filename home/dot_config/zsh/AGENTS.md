@@ -21,7 +21,7 @@ The core of the configuration is in the numbered `.zsh` files:
 *   `20-env.zsh`: Sets environment variables, such as default editors and language settings.
 *   `25-secrets.zsh`: Sources the decrypted `25-secrets.local.zsh`.
 *   `30-aliases.zsh.tmpl`: Defines a large collection of aliases for frequently used commands like `git`, `docker`, `ls` (via `eza`), and navigation.
-*   `40-tools.zsh`: Integrates third-party command-line tools like `fzf`, `direnv`, and `pipx` by sourcing their respective shell configurations.
+*   `40-tools.zsh`: Integrates third-party command-line tools (iTerm2 shell integration, Docker, `pipx`, Bun) by sourcing their shell configurations.
 *   `45-completion-aliases.zsh`: Maps completions from original commands to their corresponding aliases (e.g., `docker` completions for the `dk` alias).
 *   `completions/`: This directory holds custom completion scripts for various tools.
 

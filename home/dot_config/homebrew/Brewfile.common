@@ -5,15 +5,12 @@
 # media and document tools) lives in Brewfile.workstation.
 
 # --- Shell & Terminal ---
-brew "bash-completion@2"
-brew "make"
 brew "moreutils"
 brew "vim"
 brew "tmux"
 
 # --- Dev Tools ---
 brew "git"
-brew "git-extras"
 brew "git-lfs"
 brew "gh"
 brew "jq"
@@ -22,18 +19,11 @@ brew "shellcheck"
 brew "shfmt"
 brew "tree"
 brew "fd"
-brew "fzf"
 brew "ripgrep"
 brew "eza"
-brew "direnv"
-brew "glow"
 
 # --- Network & HTTP ---
-brew "httpie"
-brew "wget"
-brew "nmap"
 brew "ssh-copy-id"
-brew "watch"
 
 # --- Languages & Runtimes ---
 # node stays on the v24 line — native modules (better-sqlite3, …) break on newer majors.

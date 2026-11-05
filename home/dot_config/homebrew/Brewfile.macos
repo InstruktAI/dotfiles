@@ -6,10 +6,6 @@
 
 # --- GNU userland (macOS ships BSD variants; Linux already has these natively) ---
 brew "coreutils"
-brew "findutils"
-brew "gnu-sed"
-brew "gnu-tar"
-brew "grep"
 
 # --- Shell & Terminal (macOS-specific integration) ---
 brew "reattach-to-user-namespace"

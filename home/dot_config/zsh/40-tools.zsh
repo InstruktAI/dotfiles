@@ -11,22 +11,6 @@ if is_executable pipx && is_executable register-python-argcomplete; then
     eval "$(register-python-argcomplete pipx)"
 fi
 
-# direnv
-if is_executable direnv; then
-    eval "$(direnv hook zsh)"
-fi
-
-# fzf - try Homebrew location first, then system
-if [[ -r "/opt/homebrew/opt/fzf/shell/completion.zsh" ]]; then
-    source "/opt/homebrew/opt/fzf/shell/completion.zsh"
-    source "/opt/homebrew/opt/fzf/shell/key-bindings.zsh"
-elif [[ -r "/usr/share/fzf/completion.zsh" ]]; then
-    source "/usr/share/fzf/completion.zsh"
-    source "/usr/share/fzf/key-bindings.zsh"
-elif [[ -r "$HOME/.fzf.zsh" ]]; then
-    source "$HOME/.fzf.zsh"
-fi
-
 # Bun
 if [[ -d "$HOME/.bun" ]]; then
     export BUN_INSTALL="$HOME/.bun"
