@@ -190,7 +190,7 @@ before aliases before tool integrations).
 | `25-secrets.zsh` | Sources the decrypted `25-secrets.local.zsh`. |
 | `30-aliases.zsh` | Aliases for git, docker, `eza`, navigation, and the data-driven directory aliases. |
 | `32-macos.zsh` | macOS-specific shell tweaks. |
-| `40-tools.zsh` | Integrations for `fzf`, `direnv`, `pipx`, etc. |
+| `40-tools.zsh` | Integrations for iTerm2, Docker, `pipx` and Bun. |
 | `45-completion-aliases.zsh` | Maps command completions onto aliases. |
 | `completions/` | Custom completion scripts. |
 | `~/.zshenv` | Ensures PATH for non-interactive SSH shells. |

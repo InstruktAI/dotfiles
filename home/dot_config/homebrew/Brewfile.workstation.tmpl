@@ -12,12 +12,7 @@ brew "go"
 # --- Media & Documents ---
 brew "imagemagick"
 brew "poppler"
-brew "yt-dlp"
 {{- if eq .chezmoi.os "darwin" }}
-
-# --- System (macOS Dock / app-preference sync) ---
-brew "dockutil"
-brew "mackup"
 
 # --- Casks ---
 cask "docker-desktop"

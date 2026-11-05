@@ -9,10 +9,6 @@
 # consistently outrank whatever PATH the shell already inherited — the OS
 # default (e.g. apt's /usr/bin) — rather than losing to it. Order of calls is
 # priority order (first call = highest).
-#
-# direnv (see 40-tools.zsh) reasserts its own per-directory PATH entries
-# dynamically on every `cd`, after this file has already run, so it always
-# wins regardless of the order built here — nothing to protect against there.
 
 typeset -U path
 
