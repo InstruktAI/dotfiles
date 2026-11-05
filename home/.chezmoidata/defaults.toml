@@ -18,11 +18,8 @@ dst_dark_offset_minutes = 120
 # appearance derives its location from the time zone.
 
 [macos]
-# Applied by the macOS defaults script.
-languages = ["en-NL", "nl-NL"]
-locale = "nl_NL@currency=EUR"
-measurement_units = "Centimeters"
-metric_units = true
+# Machine data for the macOS defaults script, such as battery_sleep_minutes.
+# Language and region are each Mac's own choice in System Settings.
 
 # Shell aliases that cd into a directory under $HOME, defined only when that
 # directory exists. Machines add their own under [data.zsh.dir_aliases].
