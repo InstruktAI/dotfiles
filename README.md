@@ -76,10 +76,11 @@ chezmoi init          # regenerates the config with encryption enabled
 chezmoi apply
 ```
 
-The config template enables `encryption = "age"` only when
-`~/.config/chezmoi/key.txt` exists, and reads the recipient from the
-`# public key: age1…` line `age-keygen` writes into it. Without the identity,
-the encrypted targets are skipped and everything else applies.
+The config template always configures `encryption = "age"` with the identity
+at `~/.config/chezmoi/key.txt`, and reads the recipient (needed only to
+encrypt) from the `# public key: age1…` line `age-keygen` writes into it. Until
+a machine holds the identity, the encrypted targets are skipped and everything
+else applies.
 
 Creating the identity once, and adding or changing a secret:
 
@@ -239,11 +240,17 @@ Machines whose chezmoi data sets `beszel.key` run the
   `~/.cache/beszel/beszel-agent.log`.
 - **Linux:** the official `get.beszel.dev` install script, which installs the
   binary, a `beszel` system user and the `beszel-agent` systemd service with
-  daily auto-update. It needs sudo, so it runs from an interactive apply.
+  daily auto-update; it receives `KEY` and the port. `HUB_URL` and `TOKEN_FILE`
+  are set in the drop-in `/etc/systemd/system/beszel-agent.service.d/10-dotfiles.conf`,
+  rewritten on every change, and the token is copied to
+  `/etc/beszel-agent/token` (root:beszel, 0640) — never passed on a command line
+  or written into the world-readable unit. It needs sudo, so it runs from an
+  interactive apply.
 
 `KEY` (the hub's public key) and `HUB_URL` are not secret and are machine data.
-The registration token is a secret: it is the encrypted `~/.config/beszel/token`.
-The agent is reinstalled or restarted whenever any of these change.
+The registration token is a secret: it is the encrypted `~/.config/beszel/token`,
+used only on machines that hold the age identity. The agent is reinstalled or
+restarted whenever any of these change.
 
 ---
 
