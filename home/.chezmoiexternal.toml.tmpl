@@ -1,0 +1,26 @@
+# Upstream code chezmoi fetches and keeps current. Never edit what lands here.
+
+[".oh-my-zsh"]
+    type = "git-repo"
+    url = "https://github.com/ohmyzsh/ohmyzsh.git"
+    refreshPeriod = "168h"
+    [".oh-my-zsh".clone]
+        args = ["--depth", "1"]
+    [".oh-my-zsh".pull]
+        args = ["--ff-only"]
+
+{{- $target := "" }}
+{{- if eq .chezmoi.os "darwin" }}
+{{-   $target = printf "%s-apple-darwin" (eq .chezmoi.arch "arm64" | ternary "aarch64" "x86_64") }}
+{{- else if eq .chezmoi.os "linux" }}
+{{-   $target = printf "%s-unknown-linux-gnu" (eq .chezmoi.arch "arm64" | ternary "aarch64" "x86_64") }}
+{{- end }}
+{{- if $target }}
+
+# Completion for pnpm: a prebuilt binary plus its Oh My Zsh plugin file.
+[".config/zsh/omz/plugins/pnpm-shell-completion"]
+    type = "archive"
+    url = "https://github.com/g-plane/pnpm-shell-completion/releases/download/v0.5.5/pnpm-shell-completion_{{ $target }}.tar.gz"
+    exact = true
+    include = ["pnpm-shell-completion", "pnpm-shell-completion.plugin.zsh"]
+{{- end }}

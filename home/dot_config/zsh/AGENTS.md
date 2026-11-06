@@ -29,7 +29,7 @@ The core of the configuration is in the numbered `.zsh` files:
 
 These configuration files are loaded through `init.zsh`, which sources the numbered `.zsh` files in order. The numbered prefix controls dependency order (for example, helpers load before aliases and tool integrations).
 
-chezmoi deploys this directory to `~/.config/zsh` (source: `home/dot_config/zsh/` in the dotfiles repository) and keeps a small block in the user's `~/.zshrc` through `home/modify_dot_zshrc`. That block lives after `source $ZSH/oh-my-zsh.sh` so Oh My Zsh initializes first.
+chezmoi deploys this directory to `~/.config/zsh` (source: `home/dot_config/zsh/` in the dotfiles repository) and manages `~/.zshrc` (`home/dot_zshrc`), which loads Oh My Zsh first and then `init.zsh`.
 
 Managed snippet:
 
