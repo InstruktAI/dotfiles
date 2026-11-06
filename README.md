@@ -185,7 +185,7 @@ before aliases before tool integrations).
 | `06-options.zsh` | Interactive behavior (history options, directory navigation). |
 | `10-path.zsh` | `$PATH` management (Homebrew, Cargo, platform paths). |
 | `12-brew.zsh` | Homebrew shell environment. |
-| `15-completion-pre.zsh` | Completion system bootstrap. |
+| `completion-pre.zsh` | Completion directories on `fpath`, sourced by `~/.zshrc` before Oh My Zsh runs the one `compinit`. |
 | `20-env.zsh` | Environment variables (editor, locale). |
 | `25-secrets.zsh` | Sources the decrypted `25-secrets.local.zsh`. |
 | `30-aliases.zsh` | Aliases for git, docker, `eza`, navigation, and the data-driven directory aliases. |
