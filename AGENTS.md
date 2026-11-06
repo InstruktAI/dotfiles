@@ -49,4 +49,3 @@ agent needs before changing anything.
   definitions; their `run_onchange_after_50-*` scripts reload them.
 - `home/.chezmoiscripts/run_onchange_after_60-beszel-agent.sh.tmpl` — Beszel
   monitoring agent, installed where `beszel.key` is set.
-- `iterm2/` — iTerm2 preferences folder, read and written in the working tree.

@@ -54,7 +54,7 @@ installing Homebrew or Bun, `brew bundle`, macOS defaults (sudo,
 Full Disk Access prompts), the Linux Beszel agent install (sudo) and reloading
 the update agent itself — render empty then, so chezmoi skips them and runs
 them at the next interactive `chezmoi apply`. `chezmoi status` lists them as
-pending (`R`). Service definitions and their reloads, the iTerm2 preferences
+pending (`R`). Service definitions and their reloads, the iTerm2 settings
 folder and the macOS Beszel agent do apply unattended.
 
 On Linux, user timers run only while the user has a session unless lingering is
@@ -145,7 +145,6 @@ The repository root holds project files; `.chezmoiroot` points chezmoi at
 | `home/dot_local/libexec/appearance/` | macOS appearance watcher (binary and Swift source). |
 | `home/Library/LaunchAgents/` | macOS launchd agents (templates). |
 | `home/dot_config/systemd/user/` | Linux systemd `--user` units (templates). |
-| `iterm2/` | iTerm2 preferences folder (macOS), read and written in the working tree. |
 | `setup/` | Manual GPG key import/export helpers. |
 
 ### What applying does
@@ -157,7 +156,7 @@ The repository root holds project files; `.chezmoiroot` points chezmoi at
    (Linux), and the decrypted secrets.
 3. **After files:** installs Bun when missing; installs missing Brewfile entries
    whenever a Brewfile changes (and keeps `node` on the v24 line); points iTerm2
-   at `iterm2/` (macOS); applies macOS defaults when they change; reloads each
+   at its settings folder in iCloud Drive (macOS); applies macOS defaults when they change; reloads each
    launchd agent or restarts each systemd unit whose definition changed; installs
    or restarts the Beszel agent when its configuration changes.
 
@@ -198,14 +197,17 @@ before aliases before tool integrations).
 ## macOS defaults
 
 `home/.chezmoiscripts/run_onchange_after_40-macos-defaults.sh.tmpl` holds the
-system preference defaults (`defaults write`) plus the locale from chezmoi data.
+system preference defaults (`defaults write`).
 It runs whenever its rendered content changes, from an interactive apply only.
 
 ## iTerm2
 
-iTerm2 loads its preferences from `iterm2/` in the chezmoi working tree
-(`PrefsCustomFolder`), and saves changes there. Commit them from the working
-tree like any other change.
+iTerm2's settings live in iCloud Drive, in `Settings/iTerm2`, not in this
+repository. Every Mac loads them from there and iTerm2 saves each change back
+automatically (`PrefsCustomFolder`, save mode "automatically"), so the Macs
+share one set of settings the way iTerm2 is built to sync; another Mac picks
+a change up at its next iTerm2 launch. `Settings` in the iCloud Drive root is
+the one folder for app settings synced this way.
 
 ## tmux
 

@@ -1,10 +1,15 @@
 {{- if eq .chezmoi.os "darwin" -}}
 #!/bin/bash
-# Points iTerm2 at the preferences folder in the dotfiles working tree, so the
-# preferences iTerm2 saves land in the git source.
+# iTerm2 keeps its settings in iCloud Drive (Settings/iTerm2), loads them from
+# there and saves every change back automatically, so all Macs share one set of
+# settings. Applies only to a running iTerm2 after its next launch.
 set -euo pipefail
-folder={{ joinPath .chezmoi.workingTree "iterm2" | quote }}
+folder="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Settings/iTerm2"
+mkdir -p "$folder"
 defaults write com.googlecode.iterm2 PrefsCustomFolder -string "$folder"
 defaults write com.googlecode.iterm2 LoadPrefsFromCustomFolder -bool true
-echo "[iterm2] preferences folder: $folder"
+# Save mode: 2 = save changes to the folder automatically (0 on quit, 1 never).
+defaults write com.googlecode.iterm2 NoSyncNeverRemindPrefsChangesLostForFile -bool true
+defaults write com.googlecode.iterm2 NoSyncNeverRemindPrefsChangesLostForFile_selection -int 2
+echo "[iterm2] settings folder: $folder (saved automatically)"
 {{ end -}}
