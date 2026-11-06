@@ -38,8 +38,8 @@ agent needs before changing anything.
 ## Where things are
 
 - `home/dot_config/zsh/` — modular zsh configuration (see its `AGENTS.md`).
-- `home/modify_dot_zshrc` — keeps the block that sources `~/.config/zsh/init.zsh`
-  inside the machine's own `~/.zshrc`.
+- `home/dot_zshrc` — `~/.zshrc`: loads Oh My Zsh, then `~/.config/zsh/init.zsh`.
+- `home/.chezmoiexternal.toml.tmpl` — Oh My Zsh and pnpm-shell-completion, upstream code chezmoi keeps current.
 - `home/dot_local/bin/executable_appearance` and
   `home/dot_local/libexec/appearance/` — appearance management (see that
   directory's `AGENTS.md`).

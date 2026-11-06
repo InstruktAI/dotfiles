@@ -1,0 +1,27 @@
+# Managed by chezmoi from the dotfiles repo: edit the source, never this file.
+# Anything an installer appends here is overwritten by the next update; what a
+# tool needs belongs in ~/.config/zsh.
+
+# oh-my-zsh is an untouched upstream clone that chezmoi keeps current
+# (.chezmoiexternal.toml), so it never updates itself.
+export ZSH="$HOME/.oh-my-zsh"
+# Plugins that are not part of Oh My Zsh (pnpm-shell-completion) come from
+# their own releases, also through .chezmoiexternal.toml.
+ZSH_CUSTOM="$HOME/.config/zsh/omz"
+ZSH_THEME="robbyrussell"
+zstyle ':omz:update' mode disabled
+plugins=(
+  git
+  docker
+  npm
+{{- if eq .chezmoi.os "darwin" }}
+  macos
+{{- end }}
+  gpg-agent
+  python
+  last-working-dir
+  pnpm-shell-completion
+)
+source "$ZSH/oh-my-zsh.sh"
+
+source "$HOME/.config/zsh/init.zsh"

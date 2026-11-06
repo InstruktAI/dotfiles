@@ -50,7 +50,7 @@ agent (`ai.instrukt.chezmoi-update`) on macOS, a systemd `--user` timer
 hour). It pulls the source from git and applies it.
 
 The scheduled run sets `DOTFILES_UNATTENDED=1`. Scripts that need a person —
-installing Homebrew, Oh My Zsh or Bun, `brew bundle`, macOS defaults (sudo,
+installing Homebrew or Bun, `brew bundle`, macOS defaults (sudo,
 Full Disk Access prompts), the Linux Beszel agent install (sudo) and reloading
 the update agent itself — render empty then, so chezmoi skips them and runs
 them at the next interactive `chezmoi apply`. `chezmoi status` lists them as
@@ -137,7 +137,8 @@ The repository root holds project files; `.chezmoiroot` points chezmoi at
 | `home/.chezmoiignore` | Per-OS and per-machine exclusions. |
 | `home/.chezmoiscripts/` | Install and service scripts (`run_once_`/`run_onchange_`). |
 | `home/.chezmoitemplates/` | Shared template fragments. |
-| `home/modify_dot_zshrc` | Manages one block inside `~/.zshrc`. |
+| `home/dot_zshrc` | `~/.zshrc`: loads Oh My Zsh, then `~/.config/zsh`. |
+| `home/.chezmoiexternal.toml.tmpl` | Upstream code chezmoi fetches and keeps current: Oh My Zsh and pnpm-shell-completion. |
 | `home/dot_config/zsh/` | Modular zsh configuration → `~/.config/zsh`. |
 | `home/dot_config/homebrew/` | `Brewfile.common` (every machine), `Brewfile.macos` (every Mac) and `Brewfile.workstation` (workstations) → `~/.config/homebrew`. |
 | `home/dot_local/bin/` | `appearance`, `dotfiles-brew`, `brew-autoupdate*` → `~/.local/bin`. |
@@ -149,9 +150,9 @@ The repository root holds project files; `.chezmoiroot` points chezmoi at
 
 ### What applying does
 
-1. **Before files:** installs Homebrew and Oh My Zsh when missing.
-2. **Files:** the zsh config (`~/.config/zsh`, `~/.zshenv`), the managed block in
-   `~/.zshrc`, `~/.tmux.conf`, the appearance tool and its config, the
+1. **Before files:** installs Homebrew when missing; clones Oh My Zsh and pulls
+   it at most weekly.
+2. **Files:** the zsh config (`~/.config/zsh`, `~/.zshenv`), `~/.zshrc`, `~/.tmux.conf`, the appearance tool and its config, the
    Brewfiles, the helper scripts, the launchd agents (macOS) or systemd units
    (Linux), and the decrypted secrets.
 3. **After files:** installs Bun when missing; installs missing Brewfile entries
@@ -160,15 +161,14 @@ The repository root holds project files; `.chezmoiroot` points chezmoi at
    launchd agent or restarts each systemd unit whose definition changed; installs
    or restarts the Beszel agent when its configuration changes.
 
-`~/.zshrc` stays the machine's own file (Oh My Zsh theme, plugins, lines that
-tool installers append). chezmoi only keeps this block in it, after
-`source $ZSH/oh-my-zsh.sh`:
-
-```zsh
-# >>> instrukt dotfiles >>>
-[[ -r "$HOME/.config/zsh/init.zsh" ]] && source "$HOME/.config/zsh/init.zsh"
-# <<< instrukt dotfiles <<<
-```
+`~/.zshrc` is managed like every other file: it loads Oh My Zsh (default
+theme; plugins git, docker, npm, macos on macOS, gpg-agent, python,
+last-working-dir and pnpm-shell-completion) and then `~/.config/zsh/init.zsh`.
+A plugin is dropped when Oh My Zsh deprecates it or its tool is gone. Lines a tool
+installer appends to it are overwritten by the next update, so whatever a tool
+needs goes into `~/.config/zsh`. Oh My Zsh itself is an untouched upstream
+clone in `~/.oh-my-zsh` that chezmoi pulls at most weekly; its own updater is
+off. Switch the prompt in a shell with `omz theme use <name>`.
 
 GPG key import stays manual — run `setup/import-gpg-key.sh` when needed.
 
