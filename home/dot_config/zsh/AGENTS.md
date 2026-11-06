@@ -24,6 +24,7 @@ The core of the configuration is in the numbered `.zsh` files:
 *   `40-tools.zsh`: Integrates third-party command-line tools (iTerm2 shell integration, Docker, `pipx`, Bun) by sourcing their shell configurations.
 *   `45-completion-aliases.zsh`: Maps completions from original commands to their corresponding aliases (e.g., `docker` completions for the `dk` alias).
 *   `completions/`: This directory holds custom completion scripts for various tools.
+*   `completion-pre.zsh`: Puts `completions/` and Homebrew's completion directory on `fpath`; `~/.zshrc` sources it before Oh My Zsh, whose `compinit` is the only one.
 
 ## Usage
 
