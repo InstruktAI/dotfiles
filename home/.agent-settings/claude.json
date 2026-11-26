@@ -1,0 +1,27 @@
+{
+  "alwaysThinkingEnabled": true,
+  "awaySummaryEnabled": false,
+  "effortLevel": "xhigh",
+  "enabledPlugins": {
+    "pyright-lsp@claude-plugins-official": true
+  },
+  "env": {
+    "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+    "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1",
+    "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "0",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "idleCompaction": false,
+  "permissions": {
+    "defaultMode": "bypassPermissions"
+  },
+  "promptSuggestionEnabled": false,
+  "skipDangerousModePermissionPrompt": true,
+  "statusLine": {
+    "command": "bunx -y ccstatusline@2.2.32",
+    "padding": 0,
+    "type": "command"
+  },
+  "teammateMode": "in-process",
+  "tui": "fullscreen"
+}

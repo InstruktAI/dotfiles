@@ -1,0 +1,7 @@
+#!/bin/bash
+# chezmoi modify script for ~/.gemini/antigravity-cli/settings.json (Antigravity
+# CLI, `agy`): sets the managed defaults in .agent-settings/antigravity.json and
+# keeps every other key (colorScheme belongs to appearance; model,
+# trustedWorkspaces and the rest to the machine). permissions.allow gains the
+# managed rules and keeps the ones agy added.
+exec bash "$CHEZMOI_SOURCE_DIR/.agent-settings/modify" antigravity.json --union permissions.allow

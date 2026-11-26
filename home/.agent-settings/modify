@@ -1,0 +1,44 @@
+#!/bin/bash
+# Shared body of the agent CLI settings modify_ scripts. chezmoi passes the
+# current target on stdin and writes whatever this prints back to the target;
+# empty output would delete it. So this prints the merged file only when
+# merge.py succeeds, and otherwise the original bytes unchanged, with the
+# reason on stderr: a malformed settings file, a missing uv or an offline first
+# run never costs the file, and never stops the rest of the apply. Only when
+# the original cannot be held (no temp space) does it exit non-zero, which
+# chezmoi reports as an error while leaving the file as it is.
+#
+# Usage: modify DEFAULTS_FILE [merge.py options...]
+
+set -uo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+defaults="$here/$1"
+shift
+
+# Without a full copy of the original there is nothing safe to print; a
+# non-zero exit makes chezmoi report the error and leave the file alone.
+tmp="$(mktemp -d)" || exit 1
+trap 'rm -rf "$tmp"' EXIT
+cat >"$tmp/current" || exit 1
+
+uv="$(command -v uv || true)"
+if [[ -z "$uv" ]]; then
+    for candidate in "$HOME/.local/bin/uv" /opt/homebrew/bin/uv /usr/local/bin/uv /home/linuxbrew/.linuxbrew/bin/uv; do
+        if [[ -x "$candidate" ]]; then
+            uv="$candidate"
+            break
+        fi
+    done
+fi
+
+if [[ -z "$uv" ]]; then
+    echo "agent-settings: uv not found; $(basename "$defaults") defaults not applied yet" >&2
+elif "$uv" run --quiet --script "$here/merge.py" "$defaults" "$@" <"$tmp/current" >"$tmp/merged" &&
+    [[ -s "$tmp/merged" ]]; then
+    cat "$tmp/merged"
+    exit 0
+else
+    echo "agent-settings: left unchanged (defaults: $(basename "$defaults"))" >&2
+fi
+cat "$tmp/current"

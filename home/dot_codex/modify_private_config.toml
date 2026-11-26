@@ -1,0 +1,6 @@
+#!/bin/bash
+# chezmoi modify script for ~/.codex/config.toml: sets the managed defaults in
+# .agent-settings/codex.toml and keeps every other key (tui.theme belongs to
+# appearance; projects.*, notify and the rest to the machine). `model` is only
+# seeded, so a machine already on a newer model keeps it.
+exec bash "$CHEZMOI_SOURCE_DIR/.agent-settings/modify" codex.toml --seed model
