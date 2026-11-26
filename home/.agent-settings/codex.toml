@@ -1,0 +1,41 @@
+# Managed defaults for ~/.codex/config.toml. Every key here is set on each
+# apply; keys not named here (tui.theme, projects.*, notify, hooks.state,
+# tui.model_availability_nux, ...) stay the machine's own. `model` is seeded
+# only when absent (--seed in dot_codex/modify_private_config.toml).
+
+approval_policy = "never"
+check_for_update_on_startup = false
+forced_login_method = "chatgpt"
+hide_agent_reasoning = false
+model = "gpt-6-astra"
+model_auto_compact_token_limit = 900000
+model_context_window = 1000000
+model_reasoning_effort = "high"
+personality = "pragmatic"
+# 256 KiB: the 32 KiB default silently truncates a long AGENTS.md.
+project_doc_max_bytes = 262144
+project_root_markers = []
+sandbox_mode = "danger-full-access"
+show_raw_agent_reasoning = true
+suppress_unstable_features_warning = true
+
+[tui]
+auto_recap = false
+screen_reader_detection_done = true
+session_picker_view = "comfortable"
+status_line = ["context-remaining", "context-used", "current-dir", "git-branch", "model-with-reasoning"]
+status_line_use_colors = true
+
+[features]
+hooks = true
+memories = false
+multi_agent = true
+undo = true
+
+[shell_environment_policy]
+ignore_default_excludes = true
+inherit = "all"
+
+[notice]
+hide_full_access_warning = true
+hide_rate_limit_model_nudge = true

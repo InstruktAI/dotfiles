@@ -43,6 +43,11 @@ agent needs before changing anything.
 - `home/dot_local/bin/executable_appearance` and
   `home/dot_local/libexec/appearance/` — appearance management (see that
   directory's `AGENTS.md`).
+- `home/.agent-settings/` — managed defaults for the Claude Code, Codex and
+  Antigravity CLI settings files, merged by the `modify_` scripts in
+  `home/dot_claude/`, `home/dot_codex/` and `home/dot_gemini/`; every key they
+  do not name stays the machine's (README "Agent CLI settings").
+  `make test` covers them.
 - `home/dot_config/homebrew/` — Brewfiles; `dotfiles-brew` installs, diffs and
   upgrades from them.
 - `home/Library/LaunchAgents/`, `home/dot_config/systemd/user/` — service

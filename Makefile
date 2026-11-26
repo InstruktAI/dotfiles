@@ -12,4 +12,4 @@ lint:
 	@echo "no linter configured"
 
 test:
-	@echo "no test suite"
+	uv run --quiet --script tests/test_agent_settings.py

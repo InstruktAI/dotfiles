@@ -140,12 +140,15 @@ The repository root holds project files; `.chezmoiroot` points chezmoi at
 | `home/dot_zshrc` | `~/.zshrc`: loads Oh My Zsh, then `~/.config/zsh`. |
 | `home/.chezmoiexternal.toml.tmpl` | Upstream code chezmoi fetches and keeps current: Oh My Zsh and pnpm-shell-completion. |
 | `home/dot_config/zsh/` | Modular zsh configuration → `~/.config/zsh`. |
+| `home/.agent-settings/` | Managed agent CLI defaults and the merge that applies them (not deployed; see Agent CLI settings). |
+| `home/dot_claude/`, `home/dot_codex/`, `home/dot_gemini/` | `modify_` scripts that merge those defaults into each agent CLI's settings file. |
 | `home/dot_config/homebrew/` | `Brewfile.common` (every machine), `Brewfile.macos` (every Mac) and `Brewfile.workstation` (workstations) → `~/.config/homebrew`. |
 | `home/dot_local/bin/` | `appearance`, `dotfiles-brew`, `brew-autoupdate*` → `~/.local/bin`. |
 | `home/dot_local/libexec/appearance/` | macOS appearance watcher (binary and Swift source). |
 | `home/Library/LaunchAgents/` | macOS launchd agents (templates). |
 | `home/dot_config/systemd/user/` | Linux systemd `--user` units (templates). |
 | `setup/` | Manual GPG key import/export helpers. |
+| `tests/` | Tests run by `make test`, against temporary home directories. |
 
 ### What applying does
 
@@ -153,7 +156,8 @@ The repository root holds project files; `.chezmoiroot` points chezmoi at
    it at most weekly.
 2. **Files:** the zsh config (`~/.config/zsh`, `~/.zshenv`), `~/.zshrc`, `~/.tmux.conf`, the appearance tool and its config, the
    Brewfiles, the helper scripts, the launchd agents (macOS) or systemd units
-   (Linux), and the decrypted secrets.
+   (Linux), the decrypted secrets, and the managed defaults inside the agent
+   CLI settings files.
 3. **After files:** installs Bun when missing; installs missing Brewfile entries
    whenever a Brewfile changes (and keeps `node` on the v24 line); points iTerm2
    at its settings folder in iCloud Drive (macOS); applies macOS defaults when they change; reloads each
@@ -193,6 +197,51 @@ before aliases before tool integrations).
 | `45-completion-aliases.zsh` | Maps command completions onto aliases. |
 | `completions/` | Custom completion scripts. |
 | `~/.zshenv` | Ensures PATH for non-interactive SSH shells. |
+
+## Agent CLI settings
+
+The settings of Claude Code, Codex and the Antigravity CLI (`agy`) are shared
+files: the CLI itself, `appearance`, `instrukt` and each machine write keys
+into them. chezmoi therefore manages only the keys listed in
+`home/.agent-settings/`, through a `modify_` script per file, and leaves every
+other key as it finds it.
+
+| Settings file | Managed defaults | Owned elsewhere — never written |
+|---------------|------------------|---------------------------------|
+| `~/.claude/settings.json` | `claude.json` | `theme` (appearance), `pluginConfigs` (instrukt: `agents-md@builtin` instruction files), `model`, `hooks`, and every other key |
+| `~/.codex/config.toml` | `codex.toml` | `[tui].theme` (appearance), `[projects.*]` trust, `notify`, `[tui.model_availability_nux]`, `[hooks.state]`, and every other key |
+| `~/.gemini/antigravity-cli/settings.json` | `antigravity.json` | `colorScheme` (appearance), `model`, `trustedWorkspaces`, and every other key |
+
+On every apply, including the scheduled update, each file is merged:
+
+- A key in the defaults is set to its value; a table or object is merged key by
+  key, so its other keys stay. A list is one value and is replaced.
+- Codex `model` is only seeded: a machine already on another model keeps it.
+- Antigravity `permissions.allow` keeps the rules `agy` added and gains any
+  managed rule it lacks.
+- A missing file is created with the defaults.
+- A file that is already converged is left byte for byte as it is, so a CLI's
+  own formatting is never rewritten.
+- A file that does not parse, or whose managed key has another shape (an
+  object where a value is expected), is left unchanged and the reason goes to
+  stderr (`/tmp/chezmoi-update.log` for the scheduled update); the rest of the
+  apply continues. So does a machine without `uv` yet: the defaults land at the
+  next apply after `uv` is installed.
+
+To change a default, edit the file in `home/.agent-settings/`. A change a
+person makes in a CLI to a managed key is reverted at the next apply; a key the
+defaults do not name is never touched. A key that drops out of the defaults
+stays on each machine as it is: it is no longer managed, not removed.
+
+Antigravity drops keys that equal its defaults whenever it starts, so its
+defaults hold only values that differ from them; a default-valued key there
+would be rewritten on every apply.
+
+The merge is `home/.agent-settings/merge.py`, a uv script; the shared
+`home/.agent-settings/modify` wrapper prints its result only when it succeeds,
+and otherwise the file's original bytes, because a `modify_` script that prints
+nothing makes chezmoi delete the target. `make test` covers the merge, the
+wrapper and `chezmoi apply`/`verify` against temporary home directories.
 
 ## macOS defaults
 
